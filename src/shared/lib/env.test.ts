@@ -4,7 +4,6 @@ import { EnvError, parseEnv } from './env';
 
 const valid = {
   VITE_WEATHER_API_URL: 'https://weather.example.test/v1',
-  VITE_GEOCODING_API_URL: 'https://geo.example.test/v1',
 };
 
 describe('parseEnv', () => {
@@ -19,9 +18,9 @@ describe('parseEnv', () => {
     expect(parseEnv({ ...valid, VITE_VAPID_PUBLIC_KEY: '' }).VITE_VAPID_PUBLIC_KEY).toBeUndefined();
   });
 
-  it('names every missing variable in the error', () => {
+  it('names the missing variable in the error', () => {
     expect(() => parseEnv({})).toThrow(EnvError);
-    expect(() => parseEnv({})).toThrow(/VITE_WEATHER_API_URL[\s\S]*VITE_GEOCODING_API_URL/);
+    expect(() => parseEnv({})).toThrow(/VITE_WEATHER_API_URL/);
   });
 
   it('rejects non-http URLs', () => {
