@@ -11,7 +11,6 @@ const httpUrl = z.url({ protocol: /^https?$/, error: 'must be an http(s) URL' })
  */
 export const EnvSchema = z.object({
   VITE_WEATHER_API_URL: httpUrl,
-  VITE_GEOCODING_API_URL: httpUrl,
   /** Public VAPID key for Web Push. Optional until the push feature ships. */
   VITE_VAPID_PUBLIC_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
 });

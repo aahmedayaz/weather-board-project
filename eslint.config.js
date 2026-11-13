@@ -47,7 +47,7 @@ export default defineConfig([
 
   // Node-side TS: tool configs and e2e tests.
   {
-    files: ['*.config.ts', 'e2e/**/*.ts'],
+    files: ['*.config.ts', 'e2e/**/*.ts', 'api/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 
