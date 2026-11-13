@@ -1,12 +1,18 @@
+import { Card, DashboardGrid } from '@/shared/ui';
+
+import { AppShell } from './AppShell';
+
 export function App() {
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-3">
-          <h1 className="text-xl font-semibold">WeatherBoard</h1>
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-6" />
-    </div>
+    <AppShell>
+      <DashboardGrid>
+        {/* Empty state until the search and weather features land. No placeholder data. */}
+        <Card title="No city selected yet" className="md:col-span-2 xl:col-span-12">
+          <p className="text-sm text-fg-muted">
+            Search for a city to see its current conditions and forecast here.
+          </p>
+        </Card>
+      </DashboardGrid>
+    </AppShell>
   );
 }
