@@ -1,4 +1,4 @@
-import { useId, type ComponentProps } from 'react';
+import { useId, type ComponentProps, type ReactNode } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 
@@ -11,12 +11,18 @@ export type InputProps = ComponentProps<'input'> & {
   hint?: string;
   /** Inline validation message. Sets aria-invalid and is linked via aria-describedby. */
   error?: string;
+  /**
+   * Rendered right after the <input>, inside a `relative` wrapper — for adornments and
+   * popups that must anchor to the field itself (e.g. a combobox listbox at `top-full`).
+   */
+  inputAddon?: ReactNode;
 };
 
 export function Input({
   label,
   hint,
   error,
+  inputAddon,
   id,
   className,
   'aria-describedby': describedBy,
@@ -37,18 +43,21 @@ export function Input({
       <label htmlFor={inputId} className="text-sm font-medium text-fg">
         {label}
       </label>
-      <input
-        id={inputId}
-        aria-invalid={hasError || undefined}
-        aria-describedby={describedByIds === '' ? undefined : describedByIds}
-        className={cn(
-          controlHeight,
-          'w-full rounded-md border bg-surface px-3 text-base text-fg md:text-sm',
-          'placeholder:text-fg-muted disabled:cursor-not-allowed disabled:opacity-50',
-          hasError ? 'border-danger' : 'border-line-strong',
-        )}
-        {...props}
-      />
+      <div className="relative">
+        <input
+          id={inputId}
+          aria-invalid={hasError || undefined}
+          aria-describedby={describedByIds === '' ? undefined : describedByIds}
+          className={cn(
+            controlHeight,
+            'w-full rounded-md border bg-surface px-3 text-base text-fg md:text-sm',
+            'placeholder:text-fg-muted disabled:cursor-not-allowed disabled:opacity-50',
+            hasError ? 'border-danger' : 'border-line-strong',
+          )}
+          {...props}
+        />
+        {inputAddon}
+      </div>
       {hint && (
         <p id={hintId} className="text-sm text-fg-muted">
           {hint}
