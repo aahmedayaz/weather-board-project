@@ -45,3 +45,19 @@ Explain every CSP directive in a comment in README notes I can copy later.
 
 Then commit, open the PR to "main"
 ````
+
+## Prompt 4 — 2026-11-13T22:00:42.896Z
+
+````text
+P1 - (feat/design-system)
+
+Build the design system with the Linear (linear.app) /Mercury (mercury.com) direction: 
+
+Tailwind theme tokens for the light and dark palettes I provided (CSS variables so theme switching never re-renders React), Inter Variable self-hosted, tabular numbers for data, and primitives in src/shared/ui: Button, IconButton, Input (with label, hint, inline error and aria-describedby), Card, Skeleton, Banner (info, warning, error with an action), Dialog (accessible modal with focus trap and Escape for confirmations), VisuallyHidden. 
+
+All interactive elements at least 44x44 px on mobile, visible focus rings. 
+Build the page shell: header, main grid that is one column at 375, two at 768, and a 12-column dashboard at 1280, with no horizontal scroll. 
+
+Add component tests for the Input error states and the Dialog focus behaviour. 
+Keep it lean: no animation libraries.
+````
