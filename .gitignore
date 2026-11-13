@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.tsbuildinfo
+
+# Tests
+coverage
+playwright-report
+test-results
+blob-report
+playwright/.cache
+
+# Environment — only the example is committed
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Claude Code personal settings (project settings.json IS committed)
+.claude/settings.local.json
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+desktop.ini
+*.sw?
+
+# Lighthouse CI
+.lighthouseci
