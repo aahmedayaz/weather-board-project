@@ -1,13 +1,13 @@
 ---
 description: Verify, push the current feature branch, and open a PR into dev
 argument-hint: [optional PR title]
-allowed-tools: Bash(npm run verify:*), Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git push:*), Bash(gh pr create:*), Bash(gh pr view:*)
+allowed-tools: Bash(npm run verify:*), Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git add PROMPTS.md), Bash(git commit:*), Bash(git push:*), Bash(gh pr create:*), Bash(gh pr view:*)
 ---
 
 Ship the current feature branch as a PR into `dev`.
 
 1. Get the branch with `git branch --show-current`. If it does not start with `feat/`, stop — never ship from `dev` or `main`.
-2. Run `git status --porcelain`. If there are uncommitted changes, stop and list them.
+2. Run `git status --porcelain -- . ':!PROMPTS.md'`. If there are uncommitted changes, stop and list them. If only `PROMPTS.md` changed (the prompt-log hook rewrites it on every prompt), commit it as `docs: update prompt log` so the log ships with the feature.
 3. Run `npm run verify` (lint, typecheck, tests, build, e2e). If anything fails, stop, show the failing output, and do not push.
 4. `git push -u origin HEAD`
 5. If a PR already exists for this branch (`gh pr view --json url`), report its URL and stop.
