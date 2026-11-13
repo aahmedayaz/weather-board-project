@@ -61,3 +61,18 @@ Build the page shell: header, main grid that is one column at 375, two at 768, a
 Add component tests for the Input error states and the Dialog focus behaviour. 
 Keep it lean: no animation libraries.
 ````
+
+## Prompt 5 — 2026-11-13T22:38:35.082Z
+
+````text
+P2-(feat/search-autocomplete)
+
+Implement requirement 01. 
+Server: api/cities.ts Vercel function that validates the q parameter with Zod (2 to 60 characters, trimmed), calls GeoDB Cities through RapidAPI using server-only env vars, returns only the fields the UI needs (id, name, region, country, lat, lon), sets Cache-Control with s-maxage and stale-while-revalidate, and maps 429, 5xx and network failures to typed JSON errors. 
+
+Client: a useDebouncedValue hook (150 ms), TanStack Query with the abort signal, staleTime, and placeholderData that keeps the previous results while typing, so the list never flashes empty. Build an accessible combobox (role combobox, listbox, aria-activedescendant, arrow keys, Enter, Escape, click outside) with visible states: idle hint, loading, results, no results (explain what to try), rate-limited (explain and auto-retry countdown), network failure (retry button). 
+
+Validation with react-hook-form on blur: empty field shows an inline error. 
+
+Memoize result rows with a stable callback so typing does not re-render every row; show me a Profiler check or a render-count test that proves it. Add unit tests for the hook and e2e tests with mocked network for each state.
+````
