@@ -1,1 +1,146 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/*
+ * Design tokens
+ * =============
+ * Each token is defined once with `light-dark(<light>, <dark>)`. The browser picks a side from
+ * `color-scheme`, which follows the OS by default and is forced by `data-theme` on <html>:
+ *
+ *   <html>                     → follows prefers-color-scheme
+ *   <html data-theme="light">  → always light
+ *   <html data-theme="dark">   → always dark
+ *
+ * Switching theme is therefore one attribute write — the browser restyles, React never
+ * re-renders. Every text/background pair below is WCAG 2.2 AA (≥ 4.5:1); control borders and
+ * the focus ring are ≥ 3:1 against the surface.
+ */
+
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root {
+  /* Surfaces */
+  --wb-canvas: light-dark(#f7f8fa, #0d0e11);
+  --wb-surface: light-dark(#ffffff, #17181d);
+  --wb-surface-muted: light-dark(#f1f2f5, #1f2026);
+  --wb-line: light-dark(#e3e4e9, #2a2c33);
+  --wb-line-strong: light-dark(#8c8f9c, #6e717e);
+
+  /* Text */
+  --wb-fg: light-dark(#16171d, #ecedf0);
+  --wb-fg-muted: light-dark(#5b5e6b, #9ea1ad);
+
+  /* Accent */
+  --wb-accent: light-dark(#5359d1, #5e66e0);
+  --wb-accent-hover: light-dark(#474dc0, #6d75ea);
+  --wb-accent-fg: #ffffff;
+  --wb-accent-text: light-dark(#4a50c4, #a4aaf8);
+  --wb-ring: light-dark(#5359d1, #8b92f5);
+
+  /* Status */
+  --wb-danger: light-dark(#c4320a, #d92d20);
+  --wb-danger-hover: light-dark(#a92a08, #e8443a);
+  --wb-danger-fg: light-dark(#b42318, #fda29b);
+  --wb-danger-bg: light-dark(#fef3f2, #2a1515);
+  --wb-danger-line: light-dark(#fecdca, #5c2420);
+
+  --wb-warning-fg: light-dark(#8a4b00, #fbc56b);
+  --wb-warning-bg: light-dark(#fff8eb, #2a2010);
+  --wb-warning-line: light-dark(#f8dba8, #5a4318);
+
+  --wb-info-fg: light-dark(#2948b8, #9db5ff);
+  --wb-info-bg: light-dark(#eff4ff, #141c33);
+  --wb-info-line: light-dark(#c7d7fe, #2b3d73);
+
+  /* Elevation */
+  --wb-overlay: light-dark(rgb(15 16 20 / 0.45), rgb(0 0 0 / 0.6));
+  --wb-shadow-color: light-dark(rgb(16 17 22 / 0.08), rgb(0 0 0 / 0.5));
+}
+
+/*
+ * Tailwind theme. `--color-*: initial` removes Tailwind's default palette so only the tokens
+ * above exist as utilities (bg-surface, text-fg-muted, border-line, …) — no off-system colours.
+ * `inline` makes utilities reference the variables directly, so they resolve per theme.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-canvas: var(--wb-canvas);
+  --color-surface: var(--wb-surface);
+  --color-surface-muted: var(--wb-surface-muted);
+  --color-line: var(--wb-line);
+  --color-line-strong: var(--wb-line-strong);
+  --color-fg: var(--wb-fg);
+  --color-fg-muted: var(--wb-fg-muted);
+  --color-accent: var(--wb-accent);
+  --color-accent-hover: var(--wb-accent-hover);
+  --color-accent-fg: var(--wb-accent-fg);
+  --color-accent-text: var(--wb-accent-text);
+  --color-ring: var(--wb-ring);
+  --color-danger: var(--wb-danger);
+  --color-danger-hover: var(--wb-danger-hover);
+  --color-danger-fg: var(--wb-danger-fg);
+  --color-danger-bg: var(--wb-danger-bg);
+  --color-danger-line: var(--wb-danger-line);
+  --color-warning-fg: var(--wb-warning-fg);
+  --color-warning-bg: var(--wb-warning-bg);
+  --color-warning-line: var(--wb-warning-line);
+  --color-info-fg: var(--wb-info-fg);
+  --color-info-bg: var(--wb-info-bg);
+  --color-info-line: var(--wb-info-line);
+  --color-overlay: var(--wb-overlay);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-card: 0 1px 2px var(--wb-shadow-color), 0 0 0 1px var(--wb-line);
+  --shadow-overlay: 0 16px 48px var(--wb-shadow-color), 0 0 0 1px var(--wb-line);
+}
+
+@layer base {
+  html {
+    background-color: var(--wb-canvas);
+    color: var(--wb-fg);
+    font-family: var(--font-sans);
+    /* Inter: disambiguated l/I/1 and straight-sided digits read better in dense data. */
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One focus ring for everything keyboard-focusable. */
+  :focus-visible {
+    outline: 2px solid var(--wb-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Numbers in data (temperatures, wind, times) keep a fixed width so columns don't jitter. */
+@utility numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+}
