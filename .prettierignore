@@ -1,0 +1,10 @@
+# Verbatim prompt log — formatting it would alter the recorded prompts.
+PROMPTS.md
+
+package-lock.json
+dist
+coverage
+playwright-report
+test-results
+public
+.lighthouseci
