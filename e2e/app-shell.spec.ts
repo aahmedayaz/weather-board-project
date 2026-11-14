@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.js';
 
 test.describe('app shell', () => {
   test('loads with the app heading', async ({ page }) => {
