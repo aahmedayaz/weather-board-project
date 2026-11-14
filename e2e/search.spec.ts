@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
+
+import { expect, test } from './fixtures.js';
 
 /** Every test mocks /api/cities — no real RapidAPI traffic, fully deterministic. */
 const API = /\/api\/cities\?/;
