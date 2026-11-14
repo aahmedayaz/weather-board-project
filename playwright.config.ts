@@ -17,13 +17,14 @@ export default defineConfig({
     serviceWorkers: 'block',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  // Tests run against the production build (`vite preview`), not the dev server:
-  // the service worker and PWA behaviour only exist in the built app.
-  // Run `npm run build` first, or use `npm run verify`, which builds before e2e.
+  // Tests run against a production build (`vite preview`), not the dev server: the service
+  // worker and PWA behaviour only exist in a build. It is a dedicated `--mode e2e` build so
+  // public test config (.env.e2e: fake push-worker URL, throwaway VAPID key) is always present.
   webServer: {
-    command: 'npm run preview',
+    command:
+      'npx vite build --mode e2e --outDir dist-e2e --logLevel warn && npx vite preview --outDir dist-e2e',
     url: `http://localhost:${String(PORT)}`,
     reuseExistingServer: !isCI,
-    timeout: 60_000,
+    timeout: 120_000,
   },
 });
