@@ -76,3 +76,26 @@ Validation with react-hook-form on blur: empty field shows an inline error.
 
 Memoize result rows with a stable callback so typing does not re-render every row; show me a Profiler check or a render-count test that proves it. Add unit tests for the hook and e2e tests with mocked network for each state.
 ````
+
+## Prompt 6 — 2026-11-13T23:21:49.530Z
+
+````text
+
+
+<pasted_content id="27e0">
+P3-(feat/weather-display)
+
+Implement requirement 02. 
+Server: api/weather.ts that validates lat and lon with Zod, fetches current conditions and the 5-day/3-hour forecast from OpenWeatherMap in metric units, and on 429 or 5xx falls back to Open-Meteo, normalizing both into one Zod-validated WeatherBundle type (so the client never knows which source answered; include the source name for a small footer). Aggregate the 3-hour slots into five daily entries (min, max, dominant condition, precipitation chance) with a pure, unit-tested function. 
+
+Client: TanStack Query keyed by lat/lon, staleTime 10 minutes, no retry on 4xx, retry with backoff on 5xx, refetchOnWindowFocus with a throttle so rapid tab switching cannot spam the API, and a manual refresh button throttled to once per 10 seconds with visible feedback. 
+
+Build CurrentConditions and ForecastStrip with skeleton loading and specific error messages (offline, rate limited, city not found, server problem) each with a recovery action. 
+Select derived data inside useQuery so components only re-render on what they use; React.memo only on ForecastDay after measuring. 
+
+Remember the last viewed city (default Karachi) through a safe storage util: try/catch, Zod-parsed so tampered values are ignored. 
+
+Add tests including the aggregation function and error states.
+</pasted_content id="27e0">
+
+````
