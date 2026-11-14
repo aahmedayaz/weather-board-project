@@ -222,3 +222,9 @@ Do not delete any prompt.
 ````
 
 > **Review note:** Written in the same turn as these notes — nothing to correct yet.
+
+## Prompt 13 — 2026-11-14T06:22:21.864Z
+
+````text
+Test the push notification feature and fix the UI position of that div - test all the cloudflare and worker etc stuff
+````
