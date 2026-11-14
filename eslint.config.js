@@ -65,6 +65,12 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
 
+  // Classic browser script served as-is from public/.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
+
   // Last: turn off every rule that would fight Prettier.
   prettier,
 ]);
