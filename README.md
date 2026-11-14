@@ -11,8 +11,8 @@ strict TypeScript; API keys stay server-side in Vercel Functions and a Cloudflar
 | ![WeatherBoard at 375 px](docs/screenshots/weatherboard-375.png) | ![WeatherBoard at 1280 px](docs/screenshots/weatherboard-1280.png) |
 
 Dark theme at 1280 px: [docs/screenshots/weatherboard-1280-dark.png](docs/screenshots/weatherboard-1280-dark.png).
-Screenshots are of the live site with real data (three cities saved as favourites), taken
-before the push worker went live — production now also shows the **Daily reminder** card.
+Screenshots are of the live site with real data (three cities saved as favourites, the
+**Daily reminder** card ready to set up), taken on 2026-11-14.
 
 > **Production:** Vercel's production branch is `main` (promoted `dev` → `prod` → `main`).
 > Weather comes from OpenWeatherMap, and daily push reminders are live through the Cloudflare
