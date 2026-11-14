@@ -1,13 +1,15 @@
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 
 import { FavoritesPanel, FavoriteToggle } from '@/features/favorites';
 import { InstallButton, OfflineBanner, UpdateToast } from '@/features/pwa';
-import { ReminderCard } from '@/features/push';
+import { DisplaySettings } from '@/features/settings';
+import { isPushConfigured, ReminderCard } from '@/features/push';
 import { CitySearch, focusCitySearch, formatCityDetail, type City } from '@/features/search';
 import { CurrentConditions, ForecastStrip, usePrefetchWeather } from '@/features/weather';
-import { Card, DashboardGrid } from '@/shared/ui';
+import { Card, DashboardGrid, Skeleton } from '@/shared/ui';
 
 import { AppShell } from './AppShell';
+import { ProfiledRegion } from './ProfiledRegion';
 import { readLastCity, saveLastCity } from './lastCity';
 
 export function App({ initialCity }: { initialCity?: City }) {
@@ -24,36 +26,61 @@ export function App({ initialCity }: { initialCity?: City }) {
   // Layout: at 1280 px the left 4 columns hold search + the favourites sidebar and the right
   // 8 hold the weather. Below that, DOM order applies: search, favourite chips, weather.
   return (
-    <AppShell headerActions={<InstallButton />}>
+    <AppShell
+      headerActions={
+        <ProfiledRegion id="Header">
+          <InstallButton />
+          <DisplaySettings />
+        </ProfiledRegion>
+      }
+    >
       <OfflineBanner />
       <DashboardGrid>
-        <Card title="Find a city" className="md:col-span-2 xl:col-span-4 xl:row-start-1">
-          <CitySearch onSelect={selectCity} />
-        </Card>
+        <ProfiledRegion id="Search">
+          <Card title="Find a city" className="md:col-span-2 xl:col-span-4 xl:row-start-1">
+            <CitySearch onSelect={selectCity} />
+          </Card>
+        </ProfiledRegion>
 
-        <FavoritesPanel
-          activeCity={city}
-          onSelect={selectCity}
-          onPrefetch={prefetchWeather}
-          onListEmptied={focusCitySearch}
-          className="md:col-span-2 xl:col-span-4 xl:row-start-2 xl:self-start"
-        />
+        <ProfiledRegion id="Favorites">
+          <FavoritesPanel
+            activeCity={city}
+            onSelect={selectCity}
+            onPrefetch={prefetchWeather}
+            onListEmptied={focusCitySearch}
+            className="md:col-span-2 xl:col-span-4 xl:row-start-2 xl:self-start"
+          />
+        </ProfiledRegion>
 
-        <CurrentConditions
-          city={city}
-          placeDetail={formatCityDetail(city)}
-          onSearchAgain={focusCitySearch}
-          extraActions={<FavoriteToggle city={city} />}
-          className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-1"
-        />
+        <ProfiledRegion id="Current">
+          <CurrentConditions
+            city={city}
+            placeDetail={formatCityDetail(city)}
+            onSearchAgain={focusCitySearch}
+            extraActions={<FavoriteToggle city={city} />}
+            className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-1"
+          />
+        </ProfiledRegion>
 
-        <ForecastStrip
-          city={city}
-          onSearchAgain={focusCitySearch}
-          className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-2"
-        />
+        <ProfiledRegion id="Forecast">
+          <ForecastStrip
+            city={city}
+            onSearchAgain={focusCitySearch}
+            className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-2"
+          />
+        </ProfiledRegion>
 
-        <ReminderCard city={city} className="md:col-span-2 xl:col-span-4 xl:row-start-3" />
+        {isPushConfigured() && (
+          <Suspense
+            fallback={
+              <Card title="Daily reminder" className="md:col-span-2 xl:col-span-4 xl:row-start-3">
+                <Skeleton className="h-11 w-48" />
+              </Card>
+            }
+          >
+            <ReminderCard city={city} className="md:col-span-2 xl:col-span-4 xl:row-start-3" />
+          </Suspense>
+        )}
       </DashboardGrid>
       <UpdateToast />
     </AppShell>

@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { VitePWA } from 'vite-plugin-pwa';
 
 import { handleCitiesRequest } from './api/_lib/cities-handler.ts';
@@ -45,12 +46,66 @@ function apiDevServer(): Plugin {
   };
 }
 
+interface HeadTag {
+  tag: string;
+  attrs: Record<string, string | boolean>;
+  injectTo: 'head-prepend';
+}
+
+/**
+ * Build-time <head> hints:
+ * - preload the Latin Inter file (its hashed name is only known after bundling), so the font
+ *   request starts with the HTML instead of waiting for the CSS to be parsed;
+ * - preconnect to the push worker's origin when one is configured. The weather and city APIs
+ *   are same-origin (/api), so they need no preconnect.
+ */
+function headHints(pushWorkerUrl: string | undefined): Plugin {
+  return {
+    name: 'weatherboard:head-hints',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, context) {
+        const tags: HeadTag[] = [];
+        const font = Object.keys(context.bundle ?? {}).find((file) =>
+          /inter-latin-wght-normal-[\w-]+\.woff2$/.test(file),
+        );
+        if (font) {
+          tags.push({
+            tag: 'link',
+            attrs: {
+              rel: 'preload',
+              href: `/${font}`,
+              as: 'font',
+              type: 'font/woff2',
+              crossorigin: true,
+            },
+            injectTo: 'head-prepend',
+          });
+        }
+        if (pushWorkerUrl) {
+          tags.push({
+            tag: 'link',
+            attrs: { rel: 'preconnect', href: new URL(pushWorkerUrl).origin, crossorigin: true },
+            injectTo: 'head-prepend',
+          });
+        }
+        return tags;
+      },
+    },
+  };
+}
+
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
     apiDevServer(),
+    headHints(loadEnv(mode, process.cwd(), 'VITE_').VITE_PUSH_WORKER_URL),
+    // `npm run analyze` → dist/stats.html (treemap with gzip sizes).
+    mode === 'analyze' &&
+      visualizer({ filename: 'dist/stats.html', gzipSize: true, template: 'treemap' }),
     VitePWA({
       // injectManifest: we own src/sw.ts (push handlers will live there too); the plugin only
       // compiles it and injects the precache list.
@@ -95,4 +150,4 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   preview: { port: 4173, strictPort: true },
-});
+}));

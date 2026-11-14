@@ -7,13 +7,10 @@ import { Card, Skeleton, VisuallyHidden } from '@/shared/ui';
 
 import { weatherErrorKind } from '../api/fetchWeather';
 import { useWeather } from '../api/weatherQuery';
-import {
-  conditionLabel,
-  formatAge,
-  formatLocalTime,
-  formatTemperature,
-  formatWind,
-} from '../lib/format';
+import { useUnits } from '@/features/settings';
+import { formatTemperature, formatWind, temperatureUnitName } from '@/shared/lib/units';
+
+import { conditionLabel, formatAge, formatLocalTime } from '../lib/format';
 
 import { ConditionIcon } from './ConditionIcon';
 import { RefreshButton } from './RefreshButton';
@@ -43,6 +40,8 @@ export function CurrentConditions({
 }: CurrentConditionsProps) {
   const query = useWeather(city, selectCurrentView);
   const online = useOnlineStatus();
+  // Units are applied here, at render time, from metric data: toggling never refetches.
+  const units = useUnits();
 
   let body;
   if (query.data) {
@@ -58,8 +57,8 @@ export function CurrentConditions({
           />
           <div>
             <p className="numeric text-5xl font-semibold tracking-tight text-fg">
-              {formatTemperature(current.temperatureC)}
-              <VisuallyHidden>C</VisuallyHidden>
+              {formatTemperature(current.temperatureC, units)}
+              <VisuallyHidden> {temperatureUnitName(units)}</VisuallyHidden>
             </p>
             <p className="text-sm font-medium text-fg">{conditionLabel(current.condition)}</p>
           </div>
@@ -68,9 +67,11 @@ export function CurrentConditions({
           <dt className="text-fg-muted">Feels like</dt>
           <dt className="text-fg-muted">Humidity</dt>
           <dt className="text-fg-muted">Wind</dt>
-          <dd className="numeric font-medium text-fg">{formatTemperature(current.feelsLikeC)}</dd>
+          <dd className="numeric font-medium text-fg">
+            {formatTemperature(current.feelsLikeC, units)}
+          </dd>
           <dd className="numeric font-medium text-fg">{Math.round(current.humidity)}%</dd>
-          <dd className="numeric font-medium text-fg">{formatWind(current.windSpeedMs)}</dd>
+          <dd className="numeric font-medium text-fg">{formatWind(current.windSpeedMs, units)}</dd>
         </dl>
         {!online && (
           <p className="w-full rounded-md bg-warning-bg px-3 py-2 text-sm text-warning-fg">
@@ -87,8 +88,10 @@ export function CurrentConditions({
         </p>
       </div>
     );
-  } else if (query.isError || query.fetchStatus === 'paused') {
-    // `paused` = TanStack is waiting for the network to come back, with nothing cached.
+  } else if (query.isError || query.isPaused) {
+    // isPaused (not `fetchStatus === 'paused'`): TanStack tracks every result property a
+    // component reads, for good. Reading fetchStatus would re-render this card on every
+    // refetch (idle → fetching → idle); isPaused only changes when the request is paused.
     body = (
       <WeatherErrorBanner
         kind={query.isError ? weatherErrorKind(query.error) : 'offline'}

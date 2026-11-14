@@ -44,8 +44,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Build also enforces the initial-JS budget and scans dist/ for secrets.
       - name: Build
         run: npm run build
+
+      - name: vercel.json in sync with vercel.template.json
+        run: npm run vercel:config -- --check
 
       # Cache the Playwright browser binaries, keyed on the exact Playwright version
       # (each release pins its own browser build).

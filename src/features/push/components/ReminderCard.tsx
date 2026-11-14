@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import type { City } from '@/shared/api/cities-contract';
 import { Banner, Button, Card } from '@/shared/ui';
 
 import { usePushReminder } from '../hooks/usePushReminder';
 
-import { ReminderDialog } from './ReminderDialog';
+// Loaded on first open: react-hook-form's resolver and the explainer aren't needed until then.
+const ReminderDialog = lazy(() =>
+  import('./ReminderDialog').then((module) => ({ default: module.ReminderDialog })),
+);
 
 export interface ReminderCardProps {
   city: City;
@@ -104,15 +107,17 @@ export function ReminderCard({ city, className }: ReminderCardProps) {
     <Card title="Daily reminder" className={className}>
       {body}
       {dialogOpen && (
-        <ReminderDialog
-          open
-          city={city}
-          {...(state.status === 'on' ? { initialTime: state.settings.reminderTime } : {})}
-          onClose={() => {
-            setDialogOpen(false);
-          }}
-          onConfirm={(time) => enable(time, city)}
-        />
+        <Suspense fallback={null}>
+          <ReminderDialog
+            open
+            city={city}
+            {...(state.status === 'on' ? { initialTime: state.settings.reminderTime } : {})}
+            onClose={() => {
+              setDialogOpen(false);
+            }}
+            onConfirm={(time) => enable(time, city)}
+          />
+        </Suspense>
       )}
     </Card>
   );

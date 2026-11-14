@@ -34,6 +34,15 @@ export default defineConfig([
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/consistent-type-imports': 'error',
+      // Security: never inject raw HTML. All content is text rendered by React.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message:
+            'dangerouslySetInnerHTML is banned (XSS risk). Render text, or sanitize at the boundary.',
+        },
+      ],
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -63,6 +72,12 @@ export default defineConfig([
     files: ['**/*.{js,mjs,cjs}'],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
+  },
+
+  // Classic browser script served as-is from public/.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
   },
 
   // Last: turn off every rule that would fight Prettier.
