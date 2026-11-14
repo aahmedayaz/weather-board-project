@@ -3,13 +3,10 @@ import { memo } from 'react';
 import type { DailyForecast } from '@/shared/api/weather-contract';
 import { VisuallyHidden } from '@/shared/ui';
 
-import {
-  conditionLabel,
-  formatDateLong,
-  formatPercent,
-  formatTemperature,
-  formatWeekdayShort,
-} from '../lib/format';
+import { useUnits } from '@/features/settings';
+import { formatTemperature } from '@/shared/lib/units';
+
+import { conditionLabel, formatDateLong, formatPercent, formatWeekdayShort } from '../lib/format';
 
 import { ConditionIcon } from './ConditionIcon';
 
@@ -19,6 +16,7 @@ export interface ForecastDayProps {
 }
 
 export function ForecastDayRow({ day, isToday }: ForecastDayProps) {
+  const units = useUnits(); // a units switch re-renders the days (memo only skips prop-equal renders)
   return (
     <li className="flex items-center gap-3 rounded-md bg-surface-muted px-3 py-2.5 sm:flex-col sm:gap-1.5 sm:py-3 sm:text-center">
       <p className="w-12 text-sm font-medium text-fg sm:w-auto">
@@ -39,13 +37,13 @@ export function ForecastDayRow({ day, isToday }: ForecastDayProps) {
       </p>
       <p className="numeric text-sm whitespace-nowrap">
         <VisuallyHidden>High </VisuallyHidden>
-        <span className="font-semibold text-fg">{formatTemperature(day.maxC)}</span>
+        <span className="font-semibold text-fg">{formatTemperature(day.maxC, units)}</span>
         <span aria-hidden="true" className="text-fg-muted">
           {' '}
           /{' '}
         </span>
         <VisuallyHidden>, low </VisuallyHidden>
-        <span className="text-fg-muted">{formatTemperature(day.minC)}</span>
+        <span className="text-fg-muted">{formatTemperature(day.minC, units)}</span>
       </p>
     </li>
   );

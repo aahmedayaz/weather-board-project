@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
 
 import type { City } from '@/shared/api/cities-contract';
 import { cn } from '@/shared/lib/cn';
@@ -7,8 +7,12 @@ import { Banner, Card } from '@/shared/ui';
 import { isSameCity, MAX_FAVORITES } from '../store/favoritesStore';
 import { getFavoritesStore, useFavorites } from '../store/useFavorites';
 
-import { RemoveFavoriteDialog } from './RemoveFavoriteDialog';
 import { CloseIcon } from './StarIcon';
+
+// Loaded on first use: the confirmation Dialog isn't needed for the first render.
+const RemoveFavoriteDialog = lazy(() =>
+  import('./RemoveFavoriteDialog').then((module) => ({ default: module.RemoveFavoriteDialog })),
+);
 
 export interface FavoritesPanelProps {
   activeCity: City;
@@ -139,13 +143,17 @@ export function FavoritesPanel({
         </ul>
       )}
 
-      <RemoveFavoriteDialog
-        city={confirming}
-        onCancel={() => {
-          setConfirming(null); // Dialog returns focus to the × that opened it
-        }}
-        onConfirm={confirmRemoval}
-      />
+      {confirming && (
+        <Suspense fallback={null}>
+          <RemoveFavoriteDialog
+            city={confirming}
+            onCancel={() => {
+              setConfirming(null); // Dialog returns focus to the × that opened it
+            }}
+            onConfirm={confirmRemoval}
+          />
+        </Suspense>
+      )}
     </Card>
   );
 }

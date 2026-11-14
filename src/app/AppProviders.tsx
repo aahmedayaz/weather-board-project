@@ -1,8 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import { UnitsProvider } from '@/features/settings';
+
 export function AppProviders({ children }: { children: ReactNode }) {
   // Lazy initial state: one client per mounted tree (and per test render).
   const [queryClient] = useState(() => new QueryClient());
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <UnitsProvider>{children}</UnitsProvider>
+    </QueryClientProvider>
+  );
 }

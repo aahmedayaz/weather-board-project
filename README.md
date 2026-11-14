@@ -13,18 +13,20 @@ npm run dev
 
 ## Scripts
 
-| Script              | What it does                                                     |
-| ------------------- | ---------------------------------------------------------------- |
-| `dev`               | Vite dev server                                                  |
-| `build` / `preview` | Production build / serve it on :4173                             |
-| `lint`              | ESLint, zero warnings allowed                                    |
-| `typecheck`         | `tsc -b` across all project references                           |
-| `test`              | Vitest unit/component tests                                      |
-| `e2e`               | Playwright (Chromium) against the production build — build first |
-| `lhci`              | Lighthouse CI against `dist/` — build first                      |
-| `format`            | Prettier (with Tailwind class sorting)                           |
-| `verify`            | lint → typecheck → test → build → e2e (the definition of done)   |
-| `vercel:config`     | Fill the CSP placeholders in `vercel.json` (see below)           |
+| Script              | What it does                                                      |
+| ------------------- | ----------------------------------------------------------------- |
+| `dev`               | Vite dev server                                                   |
+| `build` / `preview` | Production build (+ 150 kB budget and secrets scan) / serve :4173 |
+| `analyze`           | Build with the bundle visualizer → `dist/stats.html`              |
+| `lint`              | ESLint, zero warnings allowed                                     |
+| `typecheck`         | `tsc -b` across all project references                            |
+| `test`              | Vitest unit/component tests (incl. the render audit)              |
+| `e2e`               | Playwright (Chromium) against a dedicated `--mode e2e` build      |
+| `lhci`              | Lighthouse CI against `dist/` — build first                       |
+| `format`            | Prettier (with Tailwind class sorting)                            |
+| `verify`            | lint → typecheck → test → build → vercel.json check → e2e         |
+| `vercel:config`     | Render `vercel.json` from `vercel.template.json` (see below)      |
+| `icons`             | Regenerate PWA icons from `public/icon.svg`                       |
 
 ## CI
 
@@ -36,6 +38,76 @@ accessibility, best practices and SEO. Reports are uploaded as workflow artifact
 Lighthouse 12+ no longer has a PWA category, so PWA behaviour is covered by Playwright instead
 (`e2e/pwa.spec.ts`): manifest and icons, service-worker control, offline shell and offline
 weather via `context.setOffline`, cache contents, and the install button.
+
+## Quality and hardening
+
+### Performance
+
+- **Bundle budget:** initial JS (entry script + modulepreloads) must stay **under 150 kB
+  gzipped** — `npm run build` fails otherwise (`scripts/check-bundle-budget.mjs`). Today:
+  **127.7 kB** (was 130.3 kB before lazy-loading). `npm run analyze` writes `dist/stats.html`
+  (treemap, gzip sizes). Roughly: react-dom 45 %, zod 17 %, app code 15 %, react-hook-form 9 %,
+  TanStack Query 9 %.
+- **Lazy-loaded:** the reminder card (a below-the-fold panel, only mounted when push is
+  configured), the reminder explainer dialog and the favourite-removal dialog.
+- **Head hints:** the Latin Inter file is preloaded (hashed name injected at build time). The
+  push worker origin gets a `preconnect` when configured; the weather and city APIs are
+  same-origin (`/api`), so they need none.
+- **Core Web Vitals** in Lighthouse CI: LCP ≤ 2.5 s and CLS ≤ 0.1 are errors; Total Blocking
+  Time ≤ 300 ms (lab proxy for INP) is a warning, as it depends on the runner's CPU.
+
+### Re-render audit (React Profiler)
+
+Each dashboard region is wrapped in a `<Profiler>` (no cost in production builds).
+`src/app/renderAudit.test.tsx` renders the real app, performs each interaction and records
+which regions commit — cells are commits (total render time in jsdom):
+
+| Interaction             | Header     | Search      | Favorites  | Current    | Forecast          |
+| ----------------------- | ---------- | ----------- | ---------- | ---------- | ----------------- |
+| Search typing ("lis")   | —          | 5 (14.2 ms) | —          | —          | —                 |
+| Weather refresh         | —          | —           | —          | 2 (2.9 ms) | **— (before: 1)** |
+| Favourite toggle (save) | —          | —           | 1 (4.4 ms) | 1 (0.7 ms) | —                 |
+| Theme switch (dark)     | 1 (0.8 ms) | —           | —          | —          | —                 |
+| Units switch (°F)       | 1 (0.8 ms) | —           | —          | 1 (2.3 ms) | 1 (5.5 ms)        |
+
+**Fixed:** a refresh used to re-render the forecast (and the current-conditions body) although
+their data hadn't changed. TanStack Query tracks every result property a component reads, for
+good; both read `fetchStatus` on first render to detect "paused", so every refetch
+(`idle → fetching → idle`) re-rendered them. They now read `isPaused`, which only changes when a
+request is actually paused. **Not a problem:** ~0 ms "Search" entries on clicks are bail-outs
+(an update scheduled, nothing rendered) and are counted separately. Everything else already
+touched only what displays the change: typing stays in Search (memoized rows), theme only
+re-renders the switcher, units only the components that show units.
+
+### Responsive and accessibility
+
+`e2e/responsive.spec.ts`, at 375, 768 and 1280 px and in four states (dashboard, open search
+results, favourites + removal dialog, weather error): `scrollWidth` never exceeds
+`clientWidth`, every visible interactive element is at least 44×44 px at 375, and axe (WCAG
+2.2 AA) finds nothing. It caught one real bug: the focused skip link was only 20 px tall
+(Tailwind's `not-sr-only` resets padding); its height now comes from `min-height`.
+
+### Security
+
+- `npm run build` scans `dist/` for the values of server-only keys (from your env files —
+  never printed), their names, and private-key / live-token patterns.
+- `dangerouslySetInnerHTML` is banned by lint (there is none).
+- Every API response is Zod-validated on the client: city search, weather, push-worker replies;
+  so are stored favourites/settings, URL parameters and push payloads.
+- Deployed headers verified on production (`weather-board-project.vercel.app`): CSP,
+  `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, HSTS, immutable
+  `/assets`, `no-cache` service worker. Previews are behind Vercel Deployment Protection, so
+  they can't be checked without a session.
+- `npm audit`: **0 vulnerabilities in production dependencies** (app and worker).
+
+### Known, not fixed
+
+- `npm audit` reports 21 issues in **dev-only** tooling (Lighthouse CI → puppeteer/proxy-agent,
+  typescript-eslint → minimatch, workbox-build → glob/deepmerge). None ships to users; npm's
+  only offered fixes are major-version _downgrades_, so they wait for upstream releases.
+- Lighthouse performance can dip below 0.9 on slow local machines (Total Blocking Time from
+  ~430 kB of JS); GitHub's runners pass. The next lever is moving client-side validation to
+  `zod/mini` (~17 % of initial JS).
 
 ## Daily reminders (Web Push)
 
@@ -137,19 +209,23 @@ Repeat with `--env production` / `npm run deploy:production` for production.
 
 ### CSP placeholders
 
-`vercel.json` is static: Vercel does not substitute environment variables into it. The
-`connect-src` directive therefore contains two placeholders, `__PROXY_ORIGIN__` and
-`__WORKER_ORIGIN__`, which the deploy job fills in before building:
+Vercel reads `vercel.json` as-is and never substitutes environment variables. So the
+placeholders live in **`vercel.template.json`** (`connect-src 'self' __PROXY_ORIGIN__
+__WORKER_ORIGIN__`) and the committed `vercel.json` is always a **rendered, valid** file:
 
 ```bash
-PROXY_URL=https://<proxy-host> WORKER_URL=https://<worker>.workers.dev npm run vercel:config -- --write
+npm run vercel:config -- --write                                   # no extra origins
+WORKER_URL=https://<worker>.workers.dev npm run vercel:config -- --write
+npm run vercel:config -- --check                                   # CI: in sync with template
 ```
 
-Both values are Zod-validated (https only, reduced to their origin). `PROXY_URL` is optional —
-leave it unset when the proxy is this app's own `/api`, which `'self'` already covers. If the
-placeholders are deployed unrendered, browsers ignore them as invalid sources, so requests to the
-worker are blocked (fails closed, never open). If config ever needs to be computed at deploy time
-by Vercel itself, migrate to `vercel.ts`, which runs at build time and can read env vars.
+Both values are optional and Zod-validated (https only, reduced to their origin); unset means
+"no such origin". `PROXY_URL` stays unset while the proxy is this app's own `/api`, which
+`'self'` covers. Run the render with `WORKER_URL` in the deploy step once the push worker is
+live. (Earlier, the placeholders sat in `vercel.json` itself; production then served them
+literally and every page load logged two "invalid CSP source" console errors — found by the
+hardening audit, fixed by the template.) If config ever needs to be computed by Vercel itself,
+migrate to `vercel.ts`, which runs at build time and can read env vars.
 
 ### Content-Security-Policy, directive by directive
 
