@@ -30,6 +30,11 @@ jobs:
 
       - run: npm ci
 
+      # The root ESLint config type-checks worker/ too, so it needs the worker's types
+      # (@cloudflare/workers-types, web-push) — without them every Worker API reads as `any`.
+      - name: Install worker dependencies (for type-aware lint)
+        run: npm ci --prefix worker
+
       - name: Lint
         run: npm run lint
 
