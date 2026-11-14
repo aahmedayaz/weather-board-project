@@ -33,8 +33,39 @@ npm run dev
 Playwright version) → Lighthouse CI. Lighthouse asserts a score of at least 0.9 for performance,
 accessibility, best practices and SEO. Reports are uploaded as workflow artifacts.
 
-Lighthouse 12+ no longer has a PWA category. PWA checks (manifest, service-worker registration,
-offline shell) will be Playwright tests once the PWA feature exists.
+Lighthouse 12+ no longer has a PWA category, so PWA behaviour is covered by Playwright instead
+(`e2e/pwa.spec.ts`): manifest and icons, service-worker control, offline shell and offline
+weather via `context.setOffline`, cache contents, and the install button.
+
+## PWA and offline
+
+- `vite-plugin-pwa` with the **injectManifest** strategy: `src/sw.ts` is hand-written (push
+  handlers will live in the same worker), the plugin compiles it and injects the precache list.
+- **Precache:** the app shell (JS, CSS, HTML, icons, Latin Inter subsets).
+- **`/api/weather`:** `NetworkFirst` into its own cache `weather-last-city` with
+  `ExpirationPlugin({ maxEntries: 1 })` — only the last viewed city is kept.
+- **`/api/cities`:** never cached (`NetworkOnly`).
+- Icons are generated from `public/icon.svg` with `npm run icons` (192, 512, maskable 512,
+  Apple touch icon).
+- Offline, the UI shows a page banner, renders the cached last city with “Offline — saved data.
+  This weather was observed 2 hours ago”, and city search says it needs a connection.
+- Playwright blocks service workers by default (they would bypass `page.route` mocks); the PWA
+  spec opts back in and mocks on the browser context, which also sees worker requests.
+
+### Why NetworkFirst and not StaleWhileRevalidate for weather
+
+- **Freshness is the product.** StaleWhileRevalidate always answers from the cache first and
+  updates it in the background, so an online user would see the _previous_ response — possibly
+  hours old — and only get today's weather on the _next_ request. NetworkFirst gives online
+  users live data every time and uses the cache only when the network fails or times out (6 s).
+- **The cache is a fallback, not a speed-up.** In-memory caching already exists in TanStack
+  Query (10-minute `staleTime`) and at the edge (`s-maxage=600`); a second "serve stale first"
+  layer would only stack staleness on top.
+- **Honest offline UI.** With NetworkFirst, a cached response is only ever shown when the
+  device is offline (or the API is down) — exactly when the UI labels it with its age. With
+  StaleWhileRevalidate, stale data would appear silently while online, unlabelled.
+- **`maxEntries: 1` fits NetworkFirst.** The single entry is always the last successful live
+  response for the last viewed city — the best possible offline answer.
 
 ## Deployment notes (Vercel)
 

@@ -45,6 +45,18 @@ const timeShort = new Intl.DateTimeFormat(undefined, { timeStyle: 'short', timeZ
 export const formatLocalTime = (unixSeconds: number, offsetSeconds: number) =>
   timeShort.format(new Date((unixSeconds + offsetSeconds) * 1000));
 
+const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+/** "just now", "12 minutes ago", "3 hours ago", "2 days ago" — for saved/offline data. */
+export function formatAge(unixSeconds: number, nowMs: number = Date.now()): string {
+  const minutes = Math.max(0, Math.round((nowMs / 1000 - unixSeconds) / 60));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return relative.format(-minutes, 'minute');
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return relative.format(-hours, 'hour');
+  return relative.format(-Math.round(hours / 24), 'day');
+}
+
 const viewerTime = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
 /** Clock time in the viewer's own zone (for "Updated 14:05"). */
 export const formatViewerTime = (epochMs: number) => viewerTime.format(new Date(epochMs));

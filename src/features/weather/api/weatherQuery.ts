@@ -60,6 +60,10 @@ export function weatherQueryOptions(coordinates: Coordinates) {
     retry: shouldRetryWeather,
     retryDelay: weatherRetryDelay,
     refetchOnWindowFocus: (query) => shouldRefetchOnFocus(query.state),
+    // Run the request even when the browser is offline: the service worker answers
+    // /api/weather from its cache (last viewed city). With the default 'online' mode the
+    // query would pause and never reach that cache.
+    networkMode: 'offlineFirst',
   });
 }
 

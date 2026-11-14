@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react';
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  headerActions,
+}: {
+  children: ReactNode;
+  /** Right side of the header (e.g. the install button). */
+  headerActions?: ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-fg">
       <a
@@ -17,6 +24,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <circle cx="12" cy="12" r="4.5" fill="var(--wb-accent-fg)" />
           </svg>
           <h1 className="text-[15px] font-semibold tracking-tight">WeatherBoard</h1>
+          <div className="ml-auto flex items-center gap-2">{headerActions}</div>
         </div>
       </header>
 

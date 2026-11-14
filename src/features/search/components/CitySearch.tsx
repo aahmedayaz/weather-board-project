@@ -12,6 +12,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import { CITY_QUERY_MIN, type City } from '@/shared/api/cities-contract';
+import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
 import { Banner, Input, VisuallyHidden } from '@/shared/ui';
 import { SpinnerIcon } from '@/shared/ui/icons';
 
@@ -31,6 +32,7 @@ const NO_CITIES: City[] = [];
 
 type View =
   | { kind: 'idle' }
+  | { kind: 'offline' }
   | { kind: 'loading' }
   | { kind: 'results'; cities: City[]; refreshing: boolean }
   | { kind: 'empty' }
@@ -62,6 +64,7 @@ export function CitySearch({ onSelect }: CitySearchProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const search = useCitySearch(rawQuery, open);
+  const online = useOnlineStatus();
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -73,6 +76,10 @@ export function CitySearch({ onSelect }: CitySearchProps) {
   let view: View;
   if (rawQuery.trim().length < CITY_QUERY_MIN) {
     view = { kind: 'idle' };
+  } else if (!online && search.data === undefined) {
+    // TanStack pauses queries while offline, so without this the popup would say
+    // "Searching…" forever. Resumes on its own when the connection returns.
+    view = { kind: 'offline' };
   } else if (search.isError) {
     const error = search.error;
     if (error instanceof CitySearchError && error.kind === 'rate-limited') {
@@ -287,6 +294,13 @@ export function CitySearch({ onSelect }: CitySearchProps) {
                       seconds={view.retryAfterSeconds}
                       onRetry={() => void search.refetch()}
                     />
+                  </Banner>
+                )}
+
+                {view.kind === 'offline' && (
+                  <Banner tone="warning" title="You’re offline" className="m-1">
+                    City search needs a connection. Your saved favourites still work, and search
+                    will resume when you’re back online.
                   </Banner>
                 )}
 

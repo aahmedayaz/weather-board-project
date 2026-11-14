@@ -12,6 +12,9 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${String(PORT)}`,
     trace: 'on-first-retry',
+    // The production build registers a service worker, which would answer requests itself
+    // and bypass page.route() mocks. Blocked by default; e2e/pwa.spec.ts opts back in.
+    serviceWorkers: 'block',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Tests run against the production build (`vite preview`), not the dev server:

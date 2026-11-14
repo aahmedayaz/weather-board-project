@@ -71,17 +71,35 @@ describe('CurrentConditions', () => {
     expect(await screen.findByText('20°')).toBeInTheDocument();
   });
 
-  it('offline (browser reports no network): shows the offline state without fetching', async () => {
-    const fetchMock = stubFetch(Response.json(makeBundle()));
-    onlineManager.setOnline(false);
-    renderCurrent();
-    expect(await screen.findByText('You’re offline')).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    act(() => {
-      onlineManager.setOnline(true); // TanStack resumes the paused query on reconnect
+  describe('while the browser is offline', () => {
+    function goOffline() {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+      onlineManager.setOnline(false);
+    }
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
-    expect(await screen.findByText('20°')).toBeInTheDocument();
+
+    it('still asks for weather (the service worker may have it) and labels its age', async () => {
+      // offlineFirst: the request is made anyway; here the "service worker" answers.
+      const fetchMock = stubFetch(Response.json(makeBundle()));
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(Date.UTC(2026, 10, 14, 15, 5)); // 2 h after the observation
+      goOffline();
+      renderCurrent();
+
+      expect(await screen.findByText('20°')).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(screen.getByText(/Offline — saved data\./)).toBeInTheDocument();
+      expect(screen.getByText(/observed 2 hours ago/)).toBeInTheDocument();
+    });
+
+    it('shows the offline state when nothing was saved', async () => {
+      stubFetch(new TypeError('Failed to fetch'));
+      goOffline();
+      renderCurrent();
+      expect(await screen.findByText('You’re offline')).toBeInTheDocument();
+    });
   });
 
   it('rate limited: explains and does not retry automatically', async () => {
