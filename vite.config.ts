@@ -5,10 +5,22 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 import { handleCitiesRequest } from './api/_lib/cities-handler.ts';
+import { handleWeatherRequest } from './api/_lib/weather-handler.ts';
+
+type Handler = (
+  request: Request,
+  deps: { env: Record<string, string | undefined>; fetch: typeof fetch },
+) => Promise<Response>;
+
+/** Mirrors the files in api/. */
+const API_ROUTES: Record<string, Handler> = {
+  '/api/cities': handleCitiesRequest,
+  '/api/weather': handleWeatherRequest,
+};
 
 /**
- * Dev only: serve the Vercel function at /api/cities from `vite dev`, using the same handler
- * and server-only env from .env.local (no `vercel dev` login needed). Production uses api/.
+ * Dev only: serve the Vercel functions in api/ from `vite dev`, using the same handlers and
+ * server-only env from .env.local (no `vercel dev` login needed). Production uses api/.
  */
 function apiDevServer(): Plugin {
   return {
@@ -16,16 +28,18 @@ function apiDevServer(): Plugin {
     apply: 'serve',
     configureServer(server) {
       const env = loadEnv(server.config.mode, process.cwd(), '');
-      server.middlewares.use('/api/cities', (req, res) => {
-        const url = new URL(req.originalUrl ?? '/api/cities', 'http://localhost');
-        void handleCitiesRequest(new Request(url), { env, fetch }).then(async (response) => {
-          res.statusCode = response.status;
-          response.headers.forEach((value, key) => {
-            res.setHeader(key, value);
+      for (const [route, handler] of Object.entries(API_ROUTES)) {
+        server.middlewares.use(route, (req, res) => {
+          const url = new URL(req.originalUrl ?? route, 'http://localhost');
+          void handler(new Request(url), { env, fetch }).then(async (response) => {
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => {
+              res.setHeader(key, value);
+            });
+            res.end(await response.text());
           });
-          res.end(await response.text());
         });
-      });
+      }
     },
   };
 }
