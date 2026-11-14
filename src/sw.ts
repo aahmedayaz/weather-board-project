@@ -22,6 +22,9 @@ import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { z } from 'zod';
 
+// The worker is served with the same strict CSP: skip Zod's eval probe (see zodConfig.ts).
+z.config({ jitless: true });
+
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: (string | { url: string; revision: string | null })[];
 };
