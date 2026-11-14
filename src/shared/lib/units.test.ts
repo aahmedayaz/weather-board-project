@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  celsiusToFahrenheit,
-  formatTemperature,
-  formatWind,
-  metresPerSecondToKmh,
-  metresPerSecondToMph,
-} from './units';
+import { celsiusToFahrenheit, formatTemperature, formatWind, metresPerSecondToKmh } from './units';
 
 describe('unit conversions', () => {
   it.each([
@@ -20,13 +14,12 @@ describe('unit conversions', () => {
   });
 
   it.each([
-    [0, 0, 0],
-    [1, 3.6, 2.237],
-    [10, 36, 22.369],
-    [27.78, 100.008, 62.142],
-  ])('%s m/s = %s km/h = %s mph', (ms, kmh, mph) => {
+    [0, 0],
+    [1, 3.6],
+    [10, 36],
+    [27.78, 100.008],
+  ])('%s m/s = %s km/h', (ms, kmh) => {
     expect(metresPerSecondToKmh(ms)).toBeCloseTo(kmh, 2);
-    expect(metresPerSecondToMph(ms)).toBeCloseTo(mph, 2);
   });
 });
 
@@ -42,9 +35,8 @@ describe('formatting', () => {
     expect(formatTemperature(-17.9, 'imperial')).toBe('0°'); // -0.22 °F
   });
 
-  it('switches wind between km/h and mph', () => {
-    expect(formatWind(5, 'metric')).toBe('18 km/h');
-    expect(formatWind(5, 'imperial')).toBe('11 mph');
-    expect(formatWind(0.1, 'imperial')).toBe('0 mph');
+  it('always shows wind in km/h, whatever the temperature unit', () => {
+    expect(formatWind(5)).toBe('18 km/h');
+    expect(formatWind(0.1)).toBe('0 km/h');
   });
 });
