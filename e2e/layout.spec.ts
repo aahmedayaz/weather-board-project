@@ -29,8 +29,10 @@ for (const { width, height, columns } of viewports) {
 
 test('skip link is the first tab stop and moves focus to main', async ({ page }) => {
   await page.goto('/');
-  await page.keyboard.press('Tab');
   const skip = page.getByRole('link', { name: 'Skip to main content' });
+  // Wait for React to mount: a Tab pressed before the link exists lands elsewhere (CI race).
+  await expect(skip).toBeAttached();
+  await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('main')).toBeFocused();

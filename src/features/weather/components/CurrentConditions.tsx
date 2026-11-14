@@ -1,10 +1,19 @@
+import type { ReactNode } from 'react';
+
 import type { City } from '@/shared/api/cities-contract';
 import type { WeatherBundle } from '@/shared/api/weather-contract';
+import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
 import { Card, Skeleton, VisuallyHidden } from '@/shared/ui';
 
 import { weatherErrorKind } from '../api/fetchWeather';
 import { useWeather } from '../api/weatherQuery';
-import { conditionLabel, formatLocalTime, formatTemperature, formatWind } from '../lib/format';
+import {
+  conditionLabel,
+  formatAge,
+  formatLocalTime,
+  formatTemperature,
+  formatWind,
+} from '../lib/format';
 
 import { ConditionIcon } from './ConditionIcon';
 import { RefreshButton } from './RefreshButton';
@@ -20,16 +29,20 @@ export interface CurrentConditionsProps {
   /** Detail line under the city name, e.g. "Sindh, Pakistan". */
   placeDetail: string;
   onSearchAgain: () => void;
+  /** Extra header controls from other features (e.g. a favourite toggle). */
+  extraActions?: ReactNode;
   className?: string;
 }
 
 export function CurrentConditions({
   city,
   placeDetail,
+  extraActions,
   onSearchAgain,
   className,
 }: CurrentConditionsProps) {
   const query = useWeather(city, selectCurrentView);
+  const online = useOnlineStatus();
 
   let body;
   if (query.data) {
@@ -59,6 +72,12 @@ export function CurrentConditions({
           <dd className="numeric font-medium text-fg">{Math.round(current.humidity)}%</dd>
           <dd className="numeric font-medium text-fg">{formatWind(current.windSpeedMs)}</dd>
         </dl>
+        {!online && (
+          <p className="w-full rounded-md bg-warning-bg px-3 py-2 text-sm text-warning-fg">
+            <span className="font-semibold">Offline — saved data.</span> This weather was observed{' '}
+            {formatAge(current.observedAt)}; it will update when you reconnect.
+          </p>
+        )}
         <p className="w-full text-xs text-fg-muted">
           Observed at{' '}
           <span className="numeric">
@@ -97,7 +116,12 @@ export function CurrentConditions({
     <Card
       title={city.name}
       description={placeDetail}
-      actions={<RefreshButton coordinates={city} />}
+      actions={
+        <div className="flex items-start gap-2">
+          {extraActions}
+          <RefreshButton coordinates={city} />
+        </div>
+      }
       className={className}
     >
       {body}

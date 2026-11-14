@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo",
+    "lib": ["ES2023", "WebWorker"],
+    "types": [],
+    // Workbox 7 publishes plugin types that do not satisfy exactOptionalPropertyTypes
+    // (optional callbacks typed without `| undefined`). Relaxed for the worker only.
+    "exactOptionalPropertyTypes": false
+  },
+  "include": ["src/sw.ts"],
+  "exclude": []
+}

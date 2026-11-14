@@ -43,16 +43,27 @@ export function shouldRefetchOnFocus(
   return now - Math.max(state.dataUpdatedAt, state.errorUpdatedAt) >= FOCUS_REFETCH_THROTTLE_MS;
 }
 
-export function weatherQueryOptions({ lat, lon }: Coordinates) {
+/** Key, fetcher and freshness — shared by the query and by prefetching. */
+export function weatherQueryCore({ lat, lon }: Coordinates) {
   const coordinates = { lat: roundCoordinate(lat), lon: roundCoordinate(lon) };
-  return queryOptions({
+  return {
     queryKey: ['weather', coordinates.lat, coordinates.lon] as const,
-    queryFn: ({ signal }) => fetchWeather(coordinates, signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => fetchWeather(coordinates, signal),
     staleTime: WEATHER_STALE_TIME_MS,
+  };
+}
+
+export function weatherQueryOptions(coordinates: Coordinates) {
+  return queryOptions({
+    ...weatherQueryCore(coordinates),
     gcTime: 30 * 60_000,
     retry: shouldRetryWeather,
     retryDelay: weatherRetryDelay,
     refetchOnWindowFocus: (query) => shouldRefetchOnFocus(query.state),
+    // Run the request even when the browser is offline: the service worker answers
+    // /api/weather from its cache (last viewed city). With the default 'online' mode the
+    // query would pause and never reach that cache.
+    networkMode: 'offlineFirst',
   });
 }
 

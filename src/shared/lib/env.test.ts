@@ -7,8 +7,18 @@ describe('parseEnv', () => {
     expect(parseEnv({})).toEqual({});
   });
 
-  it('keeps a provided VAPID key', () => {
-    expect(parseEnv({ VITE_VAPID_PUBLIC_KEY: 'abc' })).toEqual({ VITE_VAPID_PUBLIC_KEY: 'abc' });
+  const vapid =
+    'BNw7SklzOGSUxWDKOM2vsYFrfwR2SjV6SbRb1H-e9UUYeAYcmnWk9x8CNkaVPk5ZcL9SMd6HKRTmI6BMY4GFGN0';
+
+  it('keeps a provided VAPID key and push worker URL', () => {
+    expect(
+      parseEnv({ VITE_VAPID_PUBLIC_KEY: vapid, VITE_PUSH_WORKER_URL: 'https://push.example.test' }),
+    ).toEqual({ VITE_VAPID_PUBLIC_KEY: vapid, VITE_PUSH_WORKER_URL: 'https://push.example.test' });
+  });
+
+  it('rejects a malformed VAPID key or worker URL', () => {
+    expect(() => parseEnv({ VITE_VAPID_PUBLIC_KEY: 'abc' })).toThrow(/VITE_VAPID_PUBLIC_KEY/);
+    expect(() => parseEnv({ VITE_PUSH_WORKER_URL: 'ftp://x' })).toThrow(/VITE_PUSH_WORKER_URL/);
   });
 
   it('treats an empty optional variable as unset', () => {
