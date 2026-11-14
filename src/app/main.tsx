@@ -1,3 +1,4 @@
+import '@/shared/lib/zodConfig'; // first: before any schema is parsed
 import './index.css';
 
 import { StrictMode } from 'react';

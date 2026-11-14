@@ -130,14 +130,50 @@ describe('CitySearch', () => {
     expect(combobox).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('shows an inline error when the field is left empty (validated on blur)', async () => {
-    mockFetch();
-    const { user, combobox } = renderSearch();
-    await user.click(combobox);
-    await user.tab();
+  describe('empty-field validation', () => {
+    const errorText = /Enter a city name to search\./;
 
-    expect(combobox).toHaveAttribute('aria-invalid', 'true');
-    expect(combobox).toHaveAccessibleDescription(/Enter a city name to search\./);
+    it('does not complain when the field is merely clicked in and out', async () => {
+      mockFetch();
+      const { user, combobox } = renderSearch();
+      await user.click(combobox);
+      await user.tab();
+      expect(combobox).not.toHaveAttribute('aria-invalid');
+      expect(screen.queryByText(errorText)).not.toBeInTheDocument();
+    });
+
+    it('stays quiet while typing and clearing, then explains on blur', async () => {
+      mockFetch();
+      const { user, combobox } = renderSearch();
+      await user.type(combobox, 'li');
+      await user.clear(combobox);
+      expect(screen.queryByText(errorText)).not.toBeInTheDocument(); // still focused
+
+      await user.tab();
+      expect(combobox).toHaveAttribute('aria-invalid', 'true');
+      expect(combobox).toHaveAccessibleDescription(errorText);
+    });
+
+    it('clears the error as soon as the user is back in the field', async () => {
+      mockFetch();
+      const { user, combobox } = renderSearch();
+      await user.type(combobox, 'li');
+      await user.clear(combobox);
+      await user.tab();
+      expect(screen.getByText(errorText)).toBeInTheDocument();
+
+      await user.click(combobox);
+      expect(screen.queryByText(errorText)).not.toBeInTheDocument();
+      expect(combobox).not.toHaveAttribute('aria-invalid');
+    });
+
+    it('shows the error when Enter is pressed on an empty field', async () => {
+      mockFetch();
+      const { user, combobox } = renderSearch();
+      await user.click(combobox);
+      await user.keyboard('{Enter}');
+      expect(combobox).toHaveAttribute('aria-invalid', 'true');
+    });
   });
 
   it('wraps the production row in React.memo', async () => {

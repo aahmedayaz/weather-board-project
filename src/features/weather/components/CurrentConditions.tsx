@@ -71,7 +71,7 @@ export function CurrentConditions({
             {formatTemperature(current.feelsLikeC, units)}
           </dd>
           <dd className="numeric font-medium text-fg">{Math.round(current.humidity)}%</dd>
-          <dd className="numeric font-medium text-fg">{formatWind(current.windSpeedMs, units)}</dd>
+          <dd className="numeric font-medium text-fg">{formatWind(current.windSpeedMs)}</dd>
         </dl>
         {!online && (
           <p className="w-full rounded-md bg-warning-bg px-3 py-2 text-sm text-warning-fg">

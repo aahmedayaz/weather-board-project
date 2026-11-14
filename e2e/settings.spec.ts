@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, json, test, WEATHER_API, weatherBundle } from './fixtures.js';
 
-const unitsGroup = (page: Page) => page.getByRole('group', { name: 'Units' });
+const unitsGroup = (page: Page) => page.getByRole('group', { name: 'Temperature unit' });
 const themeGroup = (page: Page) => page.getByRole('group', { name: /^Theme/ });
 
 test.describe('theme', () => {
@@ -71,7 +71,7 @@ test.describe('units', () => {
     await unitsGroup(page).getByRole('button', { name: '°F' }).click();
 
     await expect(currentTemperature).toHaveText(/^85°\s*Fahrenheit$/); // 29.4 °C
-    await expect(page.getByText('10 mph')).toBeVisible(); // 4.6 m/s
+    await expect(page.getByText('17 km/h')).toBeVisible(); // wind unchanged: °F is temperature only
     await expect(page.getByRole('listitem').filter({ hasText: 'Today' })).toContainText('88°'); // 31 °C
     expect(weatherCalls).toBe(callsBefore); // no refetch
     expect(await page.evaluate(() => (window as unknown as { marker?: boolean }).marker)).toBe(
