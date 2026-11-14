@@ -35,7 +35,7 @@ export function ForecastStrip({ city, onSearchAgain, className }: ForecastStripP
           <WeatherSourceNote coordinates={city} />
         </>
       );
-  } else if (query.isError || query.fetchStatus === 'paused') {
+  } else if (query.isError || query.isPaused) {
     body = (
       <WeatherErrorBanner
         kind={query.isError ? weatherErrorKind(query.error) : 'offline'}

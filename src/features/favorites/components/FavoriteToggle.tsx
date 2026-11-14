@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import type { City } from '@/shared/api/cities-contract';
 import { Button } from '@/shared/ui';
@@ -6,8 +6,12 @@ import { Button } from '@/shared/ui';
 import { isSameCity, MAX_FAVORITES } from '../store/favoritesStore';
 import { getFavoritesStore, useFavorites } from '../store/useFavorites';
 
-import { RemoveFavoriteDialog } from './RemoveFavoriteDialog';
 import { StarIcon } from './StarIcon';
+
+// Loaded on first use: the confirmation Dialog isn't needed for the first render.
+const RemoveFavoriteDialog = lazy(() =>
+  import('./RemoveFavoriteDialog').then((module) => ({ default: module.RemoveFavoriteDialog })),
+);
 
 /**
  * Save / unsave the city on screen. Unsaving asks for confirmation; focus then returns to
@@ -43,16 +47,20 @@ export function FavoriteToggle({ city }: { city: City }) {
         {showLimit &&
           `You already have ${String(MAX_FAVORITES)} favourites. Remove one to add ${city.name}.`}
       </p>
-      <RemoveFavoriteDialog
-        city={confirming}
-        onCancel={() => {
-          setConfirming(null);
-        }}
-        onConfirm={(target) => {
-          getFavoritesStore().remove(target.id);
-          setConfirming(null);
-        }}
-      />
+      {confirming && (
+        <Suspense fallback={null}>
+          <RemoveFavoriteDialog
+            city={confirming}
+            onCancel={() => {
+              setConfirming(null);
+            }}
+            onConfirm={(target) => {
+              getFavoritesStore().remove(target.id);
+              setConfirming(null);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
