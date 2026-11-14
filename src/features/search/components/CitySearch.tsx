@@ -51,12 +51,15 @@ export function CitySearch({ onSelect }: CitySearchProps) {
     control,
     setValue,
     handleSubmit,
+    clearErrors,
+    trigger,
     formState: { errors },
   } = useForm<SearchFormValues>({
     resolver: zodResolver(SearchFormSchema),
-    // First validation on blur; once touched, re-validate on change so a fixed error clears
-    // as you type (plain 'onBlur' would keep it until the next blur).
-    mode: 'onTouched',
+    // Validation is driven by handleFocus/handleBlur below (and Enter → submit), so the
+    // error never nags while you're in the field. After a submit, typing re-validates.
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
     defaultValues: { query: '' },
   });
   const rawQuery = useWatch({ control, name: 'query' });
@@ -183,8 +186,18 @@ export function CitySearch({ onSelect }: CitySearchProps) {
     }
   }
 
+  // Has the user typed in the field? Clicking in and out of an untouched field is not an
+  // attempt to search, so it must not raise "Enter a city name".
+  const editedRef = useRef(false);
+
+  function handleFocus() {
+    clearErrors('query'); // no error while the user is (back) in the field
+  }
+
   function handleBlur(event: FocusEvent<HTMLInputElement>) {
-    void field.onBlur(event); // react-hook-form: validate on blur
+    void field.onBlur(event);
+    // Validate on blur only when they typed something and then left it empty.
+    if (editedRef.current && event.target.value.trim() === '') void trigger('query');
     // Keyboard focus moved somewhere outside the combobox (e.g. Tab) → close.
     const next = event.relatedTarget;
     if (next instanceof Node && !wrapperRef.current?.contains(next)) close();
@@ -228,7 +241,9 @@ export function CitySearch({ onSelect }: CitySearchProps) {
           aria-expanded={listboxVisible}
           aria-controls={listboxVisible ? listboxId : undefined}
           aria-activedescendant={listboxVisible && activeCity ? optionId(activeCity) : undefined}
+          onFocus={handleFocus}
           onChange={(event) => {
+            editedRef.current = true;
             void field.onChange(event);
             setOpen(true);
             setActiveIndex(-1);
