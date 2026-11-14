@@ -13,16 +13,6 @@ const CONDITION_LABELS: Record<WeatherCondition, string> = {
 
 export const conditionLabel = (condition: WeatherCondition) => CONDITION_LABELS[condition];
 
-/** 21.6 → "22°". Avoids "-0°". */
-export function formatTemperature(celsius: number): string {
-  const rounded = Math.round(celsius);
-  return `${String(rounded === 0 ? 0 : rounded)}°`;
-}
-
-/** m/s → "17 km/h". */
-export const formatWind = (metresPerSecond: number) =>
-  `${String(Math.round(metresPerSecond * 3.6))} km/h`;
-
 /** 0.4 → "40%". */
 export const formatPercent = (fraction: number) => `${String(Math.round(fraction * 100))}%`;
 

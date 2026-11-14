@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { FavoritesPanel, FavoriteToggle } from '@/features/favorites';
 import { InstallButton, OfflineBanner, UpdateToast } from '@/features/pwa';
+import { DisplaySettings } from '@/features/settings';
 import { ReminderCard } from '@/features/push';
 import { CitySearch, focusCitySearch, formatCityDetail, type City } from '@/features/search';
 import { CurrentConditions, ForecastStrip, usePrefetchWeather } from '@/features/weather';
@@ -24,7 +25,14 @@ export function App({ initialCity }: { initialCity?: City }) {
   // Layout: at 1280 px the left 4 columns hold search + the favourites sidebar and the right
   // 8 hold the weather. Below that, DOM order applies: search, favourite chips, weather.
   return (
-    <AppShell headerActions={<InstallButton />}>
+    <AppShell
+      headerActions={
+        <>
+          <InstallButton />
+          <DisplaySettings />
+        </>
+      }
+    >
       <OfflineBanner />
       <DashboardGrid>
         <Card title="Find a city" className="md:col-span-2 xl:col-span-4 xl:row-start-1">
