@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { City } from '@/shared/api/cities-contract';
 import type { WeatherBundle } from '@/shared/api/weather-contract';
 import { Card, Skeleton, VisuallyHidden } from '@/shared/ui';
@@ -20,12 +22,15 @@ export interface CurrentConditionsProps {
   /** Detail line under the city name, e.g. "Sindh, Pakistan". */
   placeDetail: string;
   onSearchAgain: () => void;
+  /** Extra header controls from other features (e.g. a favourite toggle). */
+  extraActions?: ReactNode;
   className?: string;
 }
 
 export function CurrentConditions({
   city,
   placeDetail,
+  extraActions,
   onSearchAgain,
   className,
 }: CurrentConditionsProps) {
@@ -97,7 +102,12 @@ export function CurrentConditions({
     <Card
       title={city.name}
       description={placeDetail}
-      actions={<RefreshButton coordinates={city} />}
+      actions={
+        <div className="flex items-start gap-2">
+          {extraActions}
+          <RefreshButton coordinates={city} />
+        </div>
+      }
       className={className}
     >
       {body}
