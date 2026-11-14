@@ -52,14 +52,33 @@ function render(env) {
 const args = process.argv.slice(2);
 
 if (args.includes('--check')) {
-  const expected = render({});
-  if (readFileSync(configPath, 'utf8') !== expected) {
+  // The committed file may already include the deployment's origins (e.g. the push worker).
+  // Accept them if they are valid https origins, and require everything else to match the
+  // template exactly.
+  const committed = readFileSync(configPath, 'utf8');
+  const connectSrc = /connect-src 'self'((?: [^;"]+)?)/.exec(committed)?.[1]?.trim() ?? '';
+  const origins = connectSrc === '' ? [] : connectSrc.split(/\s+/);
+  const valid = origins.every((origin) => {
+    try {
+      const url = new URL(origin);
+      return url.protocol === 'https:' && url.origin === origin;
+    } catch {
+      return false;
+    }
+  });
+  const [first, second] = origins;
+  const candidates = valid
+    ? [{}, { WORKER_URL: first }, { PROXY_URL: first }, { PROXY_URL: first, WORKER_URL: second }]
+    : [];
+  if (origins.length > 2 || !candidates.some((env) => committed === render(env))) {
     console.error(
       '✖ vercel.json is out of sync with vercel.template.json. Run: npm run vercel:config -- --write',
     );
     process.exit(1);
   }
-  console.log('✓ vercel.json matches vercel.template.json');
+  console.log(
+    `✓ vercel.json matches vercel.template.json${origins.length ? ` (connect-src + ${origins.join(', ')})` : ''}`,
+  );
   process.exit(0);
 }
 
