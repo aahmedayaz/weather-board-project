@@ -23,8 +23,9 @@ export function App({ initialCity }: { initialCity?: City }) {
     saveLastCity(next);
   }, []);
 
-  // Layout: at 1280 px the left 4 columns hold search + the favourites sidebar and the right
-  // 8 hold the weather. Below that, DOM order applies: search, favourite chips, weather.
+  // Layout: at 1280 px the left 4 columns stack search, the favourites sidebar and the daily
+  // reminder; the right 8 hold the weather. Below that, DOM order applies: search, favourite
+  // chips, weather, reminder.
   return (
     <AppShell
       headerActions={
@@ -66,7 +67,10 @@ export function App({ initialCity }: { initialCity?: City }) {
           <ForecastStrip
             city={city}
             onSearchAgain={focusCitySearch}
-            className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-2"
+            // Spans rows 2–3 so the left column (favourites, then reminders) stacks with
+            // normal spacing instead of row 3 starting below the forecast; self-start keeps
+            // the card its natural height rather than stretching it.
+            className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-span-2 xl:row-start-2 xl:self-start"
           />
         </ProfiledRegion>
 
