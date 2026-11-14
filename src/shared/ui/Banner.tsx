@@ -22,14 +22,18 @@ export interface BannerProps {
   /** Optional recovery action, e.g. { label: 'Try again', onAction: refetch }. */
   action?: { label: string; onAction: () => void };
   className?: string;
+  /**
+   * Live-region role. Defaults to 'alert' for errors (interrupts) and 'status' otherwise
+   * (polite). Pass 'status' for a second error that repeats one already announced.
+   */
+  role?: 'alert' | 'status';
 }
 
-export function Banner({ tone, title, children, action, className }: BannerProps) {
+export function Banner({ tone, title, children, action, className, role }: BannerProps) {
   const { box, icon } = toneStyles[tone];
   return (
     <div
-      // Errors interrupt (assertive); info and warnings wait their turn (polite).
-      role={tone === 'error' ? 'alert' : 'status'}
+      role={role ?? (tone === 'error' ? 'alert' : 'status')}
       className={cn(
         'flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center',
         box,

@@ -26,20 +26,9 @@ export type City = z.infer<typeof CitySchema>;
 export const CitiesResponseSchema = z.object({ cities: z.array(CitySchema) });
 export type CitiesResponse = z.infer<typeof CitiesResponseSchema>;
 
-export const ApiErrorCodeSchema = z.enum([
-  'INVALID_QUERY',
-  'RATE_LIMITED',
-  'UPSTREAM_ERROR',
-  'UPSTREAM_UNAVAILABLE',
-  'SERVER_MISCONFIGURED',
-]);
-export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
-
-export const ApiErrorResponseSchema = z.object({
-  error: z.object({
-    code: ApiErrorCodeSchema,
-    message: z.string(),
-    retryAfterSeconds: z.number().int().positive().optional(),
-  }),
-});
-export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+export {
+  ApiErrorCodeSchema,
+  ApiErrorResponseSchema,
+  type ApiErrorCode,
+  type ApiErrorResponse,
+} from './api-error.js';
