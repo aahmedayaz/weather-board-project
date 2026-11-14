@@ -217,16 +217,39 @@ test.describe('city search', () => {
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
-  test('validation: leaving the field empty shows an inline error', async ({ page }) => {
+  test('validation: an error only after typing then leaving the field empty, gone on refocus', async ({
+    page,
+  }) => {
     const combobox = await open(page);
+    const error = page.getByText('Enter a city name to search.');
+
+    // Clicking in and out of an untouched field is not a mistake.
     await combobox.focus();
     await page.keyboard.press('Tab');
+    await expect(error).toBeHidden();
 
-    await expect(page.getByText('Enter a city name to search.')).toBeVisible();
+    // Typing then clearing stays quiet while focused…
+    await combobox.fill('Li');
+    await combobox.fill('');
+    await expect(error).toBeHidden();
+    // …and explains once the user leaves the field empty.
+    await page.keyboard.press('Tab');
+    await expect(error).toBeVisible();
     await expect(combobox).toHaveAttribute('aria-invalid', 'true');
 
-    await combobox.fill('Li');
-    await expect(page.getByText('Enter a city name to search.')).toBeHidden();
+    // Back in the field: the error goes away while they fix it.
+    await combobox.focus();
+    await expect(error).toBeHidden();
+  });
+
+  test('a focused field shows one ring over its border, not a second outline', async ({ page }) => {
+    const combobox = await open(page);
+    await combobox.focus();
+    const ring = await combobox.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { offset: style.outlineOffset, width: style.outlineWidth, style: style.outlineStyle };
+    });
+    expect(ring).toEqual({ offset: '-1px', width: '2px', style: 'solid' });
   });
 
   test('open results have no detectable WCAG 2.2 AA violations', async ({ page }) => {

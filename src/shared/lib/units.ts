@@ -1,12 +1,12 @@
 /**
  * Display units. All weather data stays metric (°C, m/s) end to end; conversion happens only
  * here, at render time — so switching units never refetches and never reloads.
+ * The °C/°F switch affects temperatures only; wind is always shown in km/h.
  */
 export type Units = 'metric' | 'imperial';
 
 export const celsiusToFahrenheit = (celsius: number) => (celsius * 9) / 5 + 32;
 export const metresPerSecondToKmh = (metresPerSecond: number) => metresPerSecond * 3.6;
-export const metresPerSecondToMph = (metresPerSecond: number) => metresPerSecond * 2.236936;
 
 /** Rounds and avoids "-0". */
 function whole(value: number): number {
@@ -20,11 +20,9 @@ export function formatTemperature(celsius: number, units: Units): string {
   return `${String(whole(value))}°`;
 }
 
-/** 5 m/s → "18 km/h" (metric) or "11 mph" (imperial). */
-export function formatWind(metresPerSecond: number, units: Units): string {
-  return units === 'metric'
-    ? `${String(whole(metresPerSecondToKmh(metresPerSecond)))} km/h`
-    : `${String(whole(metresPerSecondToMph(metresPerSecond)))} mph`;
+/** 5 m/s → "18 km/h". Independent of the °C/°F choice. */
+export function formatWind(metresPerSecond: number): string {
+  return `${String(whole(metresPerSecondToKmh(metresPerSecond)))} km/h`;
 }
 
 /** Unit letter for screen readers next to a bare "22°". */
