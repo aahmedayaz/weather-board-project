@@ -1,66 +1,281 @@
 # WeatherBoard
 
-A Vite + React + TypeScript PWA weather dashboard. Project rules live in [CLAUDE.md](CLAUDE.md).
+An installable weather dashboard: city search with autocomplete, current conditions and a 5-day
+forecast, favourites, offline support and daily push reminders. Built with Vite, React 19 and
+strict TypeScript; API keys stay server-side in Vercel Functions and a Cloudflare Worker.
 
-## Getting started
+**Live:** <https://weather-board-project.vercel.app>
 
-```bash
-nvm use            # Node 24 (see .nvmrc; engines are enforced)
-npm ci
-cp .env.example .env.local   # fill in the values
-npm run dev
+| 375 px                                                           | 1280 px                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| ![WeatherBoard at 375 px](docs/screenshots/weatherboard-375.png) | ![WeatherBoard at 1280 px](docs/screenshots/weatherboard-1280.png) |
+
+Dark theme at 1280 px: [docs/screenshots/weatherboard-1280-dark.png](docs/screenshots/weatherboard-1280-dark.png).
+Screenshots are of the live site with real data (three cities saved as favourites).
+
+> **Production right now:** Vercel deploys the latest `dev`. `OPENWEATHER_API_KEY` is not set
+> there, so weather comes from the Open-Meteo fallback (the footer says so), and the push worker
+> isn't deployed yet, so the reminder card is hidden. Both are configuration, not code — see
+> [Setup](#setup-and-environment-variables).
+
+## Contents
+
+1. [Features](#features)
+2. [Architecture](#architecture)
+3. [Folder structure](#folder-structure)
+4. [Data flow](#data-flow)
+5. [Deliberate deviations](#deliberate-deviations)
+6. [Rendering and performance](#rendering-and-performance)
+7. [Security](#security)
+8. [Testing strategy](#testing-strategy)
+9. [Git and branching workflow](#git-and-branching-workflow)
+10. [APIs and rate limits](#apis-and-rate-limits)
+11. [Setup and environment variables](#setup-and-environment-variables)
+12. [Known limitations](#known-limitations)
+
+## Features
+
+The requirement documents aren't in this repository; the numbering below follows the prompts
+that introduced each feature (see [PROMPTS.md](PROMPTS.md)). Requirements 03 and 07 were never
+named explicitly — they are mapped to the design-system/shell and hardening work.
+
+| #   | Requirement                          | What it does                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01  | City search                          | Accessible combobox (ARIA combobox/listbox, `aria-activedescendant`, ↑ ↓ Enter Escape, click outside), 150 ms debounce, abortable requests, previous results kept while typing; idle, loading, results, no results, rate-limited (auto-retry countdown) and network-error states. |
+| 02  | Weather display                      | Current conditions + 5 daily entries aggregated from 3-hour slots; OpenWeatherMap with Open-Meteo fallback behind one contract; skeletons; offline, rate-limited, not-found and server errors each with a recovery action; throttled refresh; last city remembered.               |
+| 03  | Responsive, accessible design system | Token-based light/dark palette (AA contrast), Inter self-hosted, primitives (Button, Input, Card, Banner, Dialog with focus trap, Skeleton…), 1 / 2 / 12-column grid at 375 / 768 / 1280, 44 px touch targets, visible focus, skip link.                                          |
+| 04  | Favourites                           | Up to 5 cities, duplicates refused, cross-tab sync, Zod-checked storage with in-memory fallback and a dismissible notice; chips on phones, sidebar on desktop; confirm-to-remove with sensible focus; weather prefetched on hover/focus.                                          |
+| 05  | PWA and offline                      | Installable (manifest, maskable icon, custom install button), update toast, app shell precached, last viewed city's weather cached (NetworkFirst, 1 entry) and shown offline with its age.                                                                                        |
+| 06  | Push reminders                       | Daily forecast notification at a chosen local time: explainer before the permission prompt, Cloudflare Worker + D1 + cron, expired subscriptions removed, clear fallbacks for denied/unsupported/iOS.                                                                             |
+| 07  | Quality and hardening                | 150 kB initial-JS budget, lazy loading, React Profiler audit, responsive + axe suite at three widths, secrets scan, strict CSP and security headers, Core Web Vitals in CI.                                                                                                       |
+| B1  | Theme                                | Light / dark / system (default), follows OS changes, persisted, applied before first paint by a same-origin script (no inline script, CSP stays strict).                                                                                                                          |
+| B2  | Units                                | °C/°F with km/h ↔ mph, persisted; converted at render time from metric data — no refetch, no reload.                                                                                                                                                                              |
+| B3  | Animated icons                       | Inline SVG + CSS (rotating sun rays, drifting clouds, rain, snow, fog), transform/opacity only, paused offscreen, off under reduced motion. No Lottie (bundle size).                                                                                                              |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI["React app<br/>(features/*, shared/*)"]
+    TQ["TanStack Query cache"]
+    SW["Service worker<br/>src/sw.ts"]
+    LS[("localStorage<br/>favourites · theme · units · last city")]
+    UI <--> TQ
+    UI <--> LS
+    TQ -- "fetch /api/*" --> SW
+  end
+
+  subgraph Vercel
+    STATIC["Static app<br/>(CDN, CSP + security headers)"]
+    CITIES["api/cities.ts"]
+    WEATHER["api/weather.ts"]
+  end
+
+  subgraph Cloudflare
+    WORKER["Push worker<br/>POST /subscribe · /unsubscribe"]
+    CRON(("Cron */5 min"))
+    D1[("D1: subscriptions")]
+    WORKER <--> D1
+    CRON --> WORKER
+  end
+
+  GEODB["GeoDB Cities<br/>(RapidAPI)"]
+  OWM["OpenWeatherMap"]
+  OM["Open-Meteo"]
+  PUSH["Browser push service<br/>(FCM, Mozilla, Apple…)"]
+
+  SW -- "precache: app shell" --> STATIC
+  SW -- "NetworkFirst, 1 entry" --> WEATHER
+  SW -- "never cached" --> CITIES
+  CITIES --> GEODB
+  WEATHER -- primary --> OWM
+  WEATHER -. "fallback on 429 / 5xx / network" .-> OM
+  UI -- "subscribe (after explainer + permission)" --> WORKER
+  WORKER -- "today's forecast" --> OM
+  WORKER -- "Web Push (VAPID)" --> PUSH
+  PUSH -- "push event" --> SW
 ```
 
-## Scripts
+## Folder structure
 
-| Script              | What it does                                                      |
-| ------------------- | ----------------------------------------------------------------- |
-| `dev`               | Vite dev server                                                   |
-| `build` / `preview` | Production build (+ 150 kB budget and secrets scan) / serve :4173 |
-| `analyze`           | Build with the bundle visualizer → `dist/stats.html`              |
-| `lint`              | ESLint, zero warnings allowed                                     |
-| `typecheck`         | `tsc -b` across all project references                            |
-| `test`              | Vitest unit/component tests (incl. the render audit)              |
-| `e2e`               | Playwright (Chromium) against a dedicated `--mode e2e` build      |
-| `lhci`              | Lighthouse CI against `dist/` — build first                       |
-| `format`            | Prettier (with Tailwind class sorting)                            |
-| `verify`            | lint → typecheck → test → build → vercel.json check → e2e         |
-| `vercel:config`     | Render `vercel.json` from `vercel.template.json` (see below)      |
-| `icons`             | Regenerate PWA icons from `public/icon.svg`                       |
+```text
+├─ api/                         Vercel Functions (Web signature) — server-only keys live here
+│  ├─ cities.ts                 GET /api/cities  → GeoDB proxy
+│  ├─ weather.ts                GET /api/weather → OpenWeatherMap, Open-Meteo fallback
+│  └─ _lib/                     handlers, provider adapters, daily aggregation (+ tests)
+├─ src/
+│  ├─ app/                      entry, providers, shell, layout, last-city, Profiler regions
+│  ├─ features/
+│  │  ├─ search/                combobox, debounced query, rate-limit countdown
+│  │  ├─ weather/               query + selectors, CurrentConditions, ForecastStrip, icons
+│  │  ├─ favorites/             external store, toggle, quick-access panel
+│  │  ├─ pwa/                   install prompt, update toast, offline banner
+│  │  ├─ push/                  support detection, explainer dialog, reminder card
+│  │  └─ settings/              theme store, units context, header controls
+│  ├─ shared/
+│  │  ├─ api/                   Zod contracts shared with api/ (cities, weather, errors)
+│  │  ├─ hooks/                 useDebouncedValue, useOnlineStatus, useCountdown
+│  │  ├─ lib/                   env, safe storage, units, cn
+│  │  └─ ui/                    design-system primitives
+│  ├─ sw.ts                     service worker (precache, runtime cache, push handlers)
+│  └─ test/                     test setup and fixtures (fixtures live only here)
+├─ worker/                      Cloudflare Worker (own package.json, wrangler.toml, D1 migration)
+├─ e2e/                         Playwright specs + shared fixtures
+├─ public/                      icons (generated), theme-init.js, favicon
+├─ scripts/                     icon generation, bundle budget, secrets scan, vercel config, prompt log
+├─ vercel.template.json         headers + CSP with origin placeholders → rendered to vercel.json
+├─ CLAUDE.md                    project rules for the coding agent
+└─ PROMPTS.md                   every prompt that built this project, annotated
+```
 
-## CI
+Features import from `shared/` and from each other's `index.ts` only; `shared/` never imports
+features. `src/shared/api/*-contract.ts` is compiled for both the browser and Node, so the client
+and the Vercel Functions validate against the very same Zod schemas.
 
-`.github/workflows/ci.yml` runs on every pull request and on pushes to `dev`, `prod` and `main`:
-`npm ci` → lint → typecheck → unit tests → build → Playwright e2e (browser binaries cached per
-Playwright version) → Lighthouse CI. Lighthouse asserts a score of at least 0.9 for performance,
-accessibility, best practices and SEO. Reports are uploaded as workflow artifacts.
+## Data flow
 
-Lighthouse 12+ no longer has a PWA category, so PWA behaviour is covered by Playwright instead
-(`e2e/pwa.spec.ts`): manifest and icons, service-worker control, offline shell and offline
-weather via `context.setOffline`, cache contents, and the install button.
+### Search
 
-## Quality and hardening
+```mermaid
+sequenceDiagram
+  actor User
+  participant CB as Combobox (CitySearch)
+  participant Q as TanStack Query
+  participant API as /api/cities (Vercel)
+  participant G as GeoDB (RapidAPI)
+  User->>CB: types "lis"
+  CB->>CB: debounce 150 ms (previous results stay visible)
+  CB->>Q: key ['cities', 'lis']
+  Q->>API: GET /api/cities?q=lis (aborted if a newer query starts)
+  API->>API: Zod: q trimmed, 2–60 chars
+  API->>G: namePrefix=lis, X-RapidAPI-Key (server env)
+  G-->>API: cities / 429 / 5xx
+  API-->>Q: {cities:[id,name,region,country,lat,lon]} + s-maxage=1 day<br/>or typed error (RATE_LIMITED + retryAfterSeconds…)
+  Q-->>CB: Zod-validated result → results / empty / countdown / retry
+  User->>CB: ↓ Enter
+  CB->>CB: onSelect(city) → app state + remembered city
+```
 
-### Performance
+### Weather
 
-- **Bundle budget:** initial JS (entry script + modulepreloads) must stay **under 150 kB
-  gzipped** — `npm run build` fails otherwise (`scripts/check-bundle-budget.mjs`). Today:
-  **127.7 kB** (was 130.3 kB before lazy-loading). `npm run analyze` writes `dist/stats.html`
-  (treemap, gzip sizes). Roughly: react-dom 45 %, zod 17 %, app code 15 %, react-hook-form 9 %,
-  TanStack Query 9 %.
-- **Lazy-loaded:** the reminder card (a below-the-fold panel, only mounted when push is
-  configured), the reminder explainer dialog and the favourite-removal dialog.
-- **Head hints:** the Latin Inter file is preloaded (hashed name injected at build time). The
-  push worker origin gets a `preconnect` when configured; the weather and city APIs are
-  same-origin (`/api`), so they need none.
-- **Core Web Vitals** in Lighthouse CI: LCP ≤ 2.5 s and CLS ≤ 0.1 are errors; Total Blocking
-  Time ≤ 300 ms (lab proxy for INP) is a warning, as it depends on the runner's CPU.
+```mermaid
+sequenceDiagram
+  participant C as CurrentConditions / ForecastStrip
+  participant Q as TanStack Query (weather, lat, lon)
+  participant SW as Service worker
+  participant API as /api/weather (Vercel)
+  participant OWM as OpenWeatherMap
+  participant OM as Open-Meteo
+  C->>Q: useWeather(city, select slice)
+  Q->>SW: GET /api/weather?lat&lon (staleTime 10 min, offlineFirst)
+  SW->>API: NetworkFirst (6 s timeout)
+  API->>OWM: current + 5-day/3-hour, metric (parallel)
+  alt 429, 5xx, network, bad key or bad body
+    API->>OM: current + hourly
+  end
+  API->>API: normalize → aggregateDaily() → WeatherBundle (Zod)
+  API-->>SW: bundle + s-maxage=600
+  SW->>SW: keep only this response (maxEntries 1)
+  SW-->>Q: bundle (or the cached one when offline)
+  Q-->>C: each component re-renders only if its selected slice changed
+```
 
-### Re-render audit (React Profiler)
+### Push reminder
 
-Each dashboard region is wrapped in a `<Profiler>` (no cost in production builds).
-`src/app/renderAudit.test.tsx` renders the real app, performs each interaction and records
-which regions commit — cells are commits (total render time in jsdom):
+```mermaid
+sequenceDiagram
+  actor User
+  participant App as Reminder card
+  participant B as Browser (Notification, PushManager)
+  participant W as Push worker
+  participant D as D1
+  participant OM as Open-Meteo
+  participant PS as Push service
+  participant SW as Service worker
+  User->>App: Set up daily reminder
+  App->>User: explainer: what, when, how to stop + time picker (validated on blur)
+  User->>App: Turn on reminders
+  App->>B: Notification.requestPermission()
+  B-->>App: granted / denied (denied → re-enable instructions)
+  App->>B: pushManager.subscribe(VAPID public key)
+  App->>W: POST /subscribe {subscription, HH:mm, IANA zone, city} (CORS allowlist, Zod)
+  W->>D: upsert (today skipped if the time already passed)
+  loop every 5 minutes (cron)
+    W->>D: per time zone: due in the last hour, not sent today
+    W->>OM: one forecast per place
+    W->>PS: Web Push (web-push, VAPID)
+    alt 404 / 410
+      W->>D: delete subscription
+    else sent
+      W->>D: mark sent today
+    end
+  end
+  PS-->>SW: push → showNotification (payload Zod-validated)
+  User->>SW: click → focus/open /?name=…&lat=…&lon= (saved city)
+```
+
+## Deliberate deviations
+
+The app is not a pure static SPA calling public APIs directly. Two server pieces were added on
+purpose:
+
+**1. Vercel Functions as an API proxy (`api/cities.ts`, `api/weather.ts`).**
+
+- **Keys stay secret.** RapidAPI and OpenWeatherMap keys would be public in a client bundle.
+  The functions read them from server-only env; `npm run build` scans `dist/` to prove none leak.
+- **One contract, any provider.** OpenWeatherMap and Open-Meteo differ completely; the function
+  normalizes both into one Zod-validated `WeatherBundle` and aggregates 3-hour slots into five
+  days, so the client never knows (or branches on) which provider answered.
+- **Resilience.** Automatic fallback to Open-Meteo on 429/5xx/network/bad key; every failure
+  becomes a typed JSON error the UI can explain.
+- **Caching.** `s-maxage` + `stale-while-revalidate` at Vercel's edge collapses many users'
+  requests into few upstream calls — essential for GeoDB's ~1 request/second free tier.
+- **Same origin.** `/api` is covered by `connect-src 'self'`: no CORS, no extra preconnect.
+
+**2. A Cloudflare Worker for push (`worker/`).**
+
+- Daily reminders need a **scheduler every 5 minutes** and a **small database**. Cloudflare
+  Workers give both on the free plan (Cron Triggers + D1); Vercel's free (Hobby) plan limits
+  cron jobs to once a day, which can't deliver "07:30 local time" across time zones.
+- Sending Web Push needs the **VAPID private key**, so it can only run server-side; the Worker
+  stores it as a `wrangler secret`.
+- It is independent of the web deploy: the app works fully without it (the card hides itself).
+- Library: the official `web-push` 4.x, verified to run in `workerd` under `nodejs_compat`
+  (VAPID keys, aes128gcm encryption, ES256 signing and an HTTPS send all succeeded). A
+  WebCrypto-only library such as `@pushforge/builder` would be a one-file swap
+  (`worker/src/sender.ts`) if bundle size ever matters.
+
+## Rendering and performance
+
+**Decisions** (rules in [CLAUDE.md](CLAUDE.md)):
+
+- **State lives low, derived where possible.** Views are derived during render (e.g. the
+  combobox's `view` and the "Today" label); no effect copies state into state. The one
+  sanctioned exception is `useDebouncedValue` (time-based).
+- **Subscribe to slices.** One weather query per city; components use `select` with
+  module-level selectors, so structural sharing keeps unchanged slices referentially equal.
+- **External stores, not context, for app-wide state that changes often**: favourites, theme,
+  online status and PWA state use `useSyncExternalStore`. Theme switching is one attribute write
+  on `<html>`; only the switcher re-renders.
+- **Context only where it fits:** units are a string context (stable without `useMemo`) read
+  only by components that display temperatures or wind; the setter is a separate context.
+- **Memoize only with a measured reason.** `CityOption` rows (render-count test: typing three
+  letters re-renders **0** rows) and `ForecastDay` (measured: a refetch that changes one day
+  re-renders **5 → 1** days). Nothing else is memoized.
+- **Lazy-load non-critical UI:** the reminder card and both confirmation dialogs. Search was
+  tried lazily too and reverted — it added layout shift without lowering blocking time.
+- **Budget:** initial JS **127.7 kB gzipped** of a **150 kB** budget enforced by `npm run build`;
+  `npm run analyze` writes `dist/stats.html`. Roughly react-dom 45 %, zod 17 %, app 15 %,
+  react-hook-form 9 %, TanStack Query 9 %.
+- **Head hints:** the Latin Inter file is preloaded (hashed name injected at build); a
+  `preconnect` is added for the push worker's origin when configured. Only Latin font subsets
+  are precached by the service worker.
+- **Core Web Vitals in CI:** Lighthouse asserts LCP ≤ 2.5 s and CLS ≤ 0.1 (errors), TBT ≤ 300 ms
+  (warning; lab proxy for INP), and ≥ 0.9 in all four categories.
+
+**Re-render audit** (`src/app/renderAudit.test.tsx`, React Profiler around each region; cells
+are commits and total render time in jsdom):
 
 | Interaction             | Header     | Search      | Favorites  | Current    | Forecast          |
 | ----------------------- | ---------- | ----------- | ---------- | ---------- | ----------------- |
@@ -70,223 +285,163 @@ which regions commit — cells are commits (total render time in jsdom):
 | Theme switch (dark)     | 1 (0.8 ms) | —           | —          | —          | —                 |
 | Units switch (°F)       | 1 (0.8 ms) | —           | —          | 1 (2.3 ms) | 1 (5.5 ms)        |
 
-**Fixed:** a refresh used to re-render the forecast (and the current-conditions body) although
-their data hadn't changed. TanStack Query tracks every result property a component reads, for
-good; both read `fetchStatus` on first render to detect "paused", so every refetch
-(`idle → fetching → idle`) re-rendered them. They now read `isPaused`, which only changes when a
-request is actually paused. **Not a problem:** ~0 ms "Search" entries on clicks are bail-outs
-(an update scheduled, nothing rendered) and are counted separately. Everything else already
-touched only what displays the change: typing stays in Search (memoized rows), theme only
-re-renders the switcher, units only the components that show units.
+The one real problem it found: a refresh re-rendered unchanged weather cards because they read
+`fetchStatus` (TanStack Query tracks every property a component reads, for good); they now read
+`isPaused`. The test asserts these minimal sets, so a regression fails CI.
 
-### Responsive and accessibility
+## Security
 
-`e2e/responsive.spec.ts`, at 375, 768 and 1280 px and in four states (dashboard, open search
-results, favourites + removal dialog, weather error): `scrollWidth` never exceeds
-`clientWidth`, every visible interactive element is at least 44×44 px at 375, and axe (WCAG
-2.2 AA) finds nothing. It caught one real bug: the focused skip link was only 20 px tall
-(Tailwind's `not-sr-only` resets padding); its height now comes from `min-height`.
+- **Strict CSP**, no `unsafe-inline` / `unsafe-eval`; the pre-paint theme script is a same-origin
+  file for exactly this reason. Directive by directive:
 
-### Security
+  ```text
+  default-src 'self';            # fallback for every fetch type: this origin only
+  script-src 'self';             # no inline or third-party scripts; injected <script> can't run
+  style-src 'self';              # stylesheets from this origin (React style props use CSSOM)
+  img-src 'self' data:;          # own images plus inlined data: URIs
+  font-src 'self';               # self-hosted Inter; no font CDN
+  connect-src 'self' [origins];  # /api plus, once rendered, the push worker origin
+  manifest-src 'self';           # web app manifest from this origin
+  worker-src 'self';             # service worker from this origin
+  object-src 'none';             # no plugins (<object>/<embed>)
+  base-uri 'self';               # an injected <base> can't redirect relative URLs
+  form-action 'self';            # forms can't post elsewhere
+  frame-ancestors 'none';        # no framing (clickjacking); X-Frame-Options: DENY too
+  upgrade-insecure-requests      # stray http:// subresources upgraded to https://
+  ```
 
-- `npm run build` scans `dist/` for the values of server-only keys (from your env files —
-  never printed), their names, and private-key / live-token patterns.
-- `dangerouslySetInnerHTML` is banned by lint (there is none).
-- Every API response is Zod-validated on the client: city search, weather, push-worker replies;
-  so are stored favourites/settings, URL parameters and push payloads.
-- Deployed headers verified on production (`weather-board-project.vercel.app`): CSP,
-  `nosniff`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, HSTS, immutable
-  `/assets`, `no-cache` service worker. Previews are behind Vercel Deployment Protection, so
-  they can't be checked without a session.
-- `npm audit`: **0 vulnerabilities in production dependencies** (app and worker).
+- **Env-driven CSP origins without broken output.** Vercel reads `vercel.json` literally, so
+  placeholders live in `vercel.template.json` and `npm run vercel:config -- --write` renders a
+  valid `vercel.json` (`WORKER_URL`/`PROXY_URL` optional, Zod-validated, https only);
+  `--check` keeps the two in sync in CI. The hardening audit found the earlier version serving
+  literal placeholders in production (two console errors per page view); fixed.
+- **Other headers:** `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation self-only; camera,
+  microphone, payment, USB off), `X-Frame-Options: DENY`; HSTS from Vercel. Verified on
+  production with `curl`. Notifications are deliberately absent from `Permissions-Policy`: it
+  is not a standardized feature there, and Chrome logs an error for it.
+- **Caching:** hashed `/assets/*` are `immutable` for a year; `index.html`, `sw.js` and the
+  manifest always revalidate.
+- **Validate every boundary with Zod:** API responses on the client, query params and upstream
+  payloads in the functions, worker request bodies, storage reads (tampered values are ignored
+  and removed), URL parameters and push payloads (same-origin URLs only).
+- **Secrets:** server-only keys never reach the client; `npm run build` fails if `dist/` contains
+  a key value (read from env files, never printed), a server-only variable name, or a
+  private-key/live-token pattern. VAPID keys are `wrangler secret`s.
+- **No `dangerouslySetInnerHTML`** — banned by lint.
+- **Dependencies:** `npm audit` reports **0** vulnerabilities in production dependencies (app and
+  worker).
+- **PWA caveat:** a page served from the service worker's precache carries the headers it was
+  cached with, so a header change reaches returning visitors once the new worker activates
+  (the update toast). Verified: a fresh profile shows zero console errors on production.
 
-### Known, not fixed
+## Testing strategy
 
-- `npm audit` reports 21 issues in **dev-only** tooling (Lighthouse CI → puppeteer/proxy-agent,
-  typescript-eslint → minimatch, workbox-build → glob/deepmerge). None ships to users; npm's
-  only offered fixes are major-version _downgrades_, so they wait for upstream releases.
-- Lighthouse performance can dip below 0.9 on slow local machines (Total Blocking Time from
-  ~430 kB of JS); GitHub's runners pass. The next lever is moving client-side validation to
-  `zod/mini` (~17 % of initial JS).
+| Layer              | Tool                                    | Count | What it covers                                                                                                                                                                                                                                                  |
+| ------------------ | --------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit / component   | Vitest + RTL + jsdom                    |   185 | Hooks, stores (favourites, theme), conversions, aggregation, error mapping, retry/backoff/throttle policies, components' loading/empty/error states, render counts, the Profiler audit, both API handlers with fake upstreams.                                  |
+| Worker             | Vitest (Node)                           |    40 | Pure reminder logic with a fake store/sender/clock (time zones, DST, no double send, 60-min catch-up, 404/410 deletion), HTTP API (CORS, Zod, methods), sender status mapping.                                                                                  |
+| End to end         | Playwright (Chromium) + axe             |    73 | Every user flow and state with the network mocked at the route level: search, weather, favourites, PWA offline (real service worker, `context.setOffline`), push (mocked permission + subscription), theme/units persistence, responsive + axe at 375/768/1280. |
+| Quality gates (CI) | ESLint, `tsc -b`, budget, secrets, LHCI |     — | Zero lint warnings, type-checks across app/node/e2e/api/sw/worker, 150 kB budget, secrets scan, `vercel.json` sync, Lighthouse ≥ 0.9 + Core Web Vitals.                                                                                                         |
 
-## Daily reminders (Web Push)
+E2E runs against a production build made with `--mode e2e`, which loads the committed, public
+`.env.e2e` (a fake worker URL and a throwaway VAPID public key). Service workers are blocked by
+default so `page.route` mocks apply; the PWA and push specs opt back in and mock at the browser
+context, which also sees service-worker requests.
 
-A Cloudflare Worker in [`worker/`](worker) stores push subscriptions in D1 and, from a Cron
-Trigger every 5 minutes, sends each subscriber a short forecast at their chosen local time.
+**What CI cannot test end to end, and how it was checked manually:**
 
-### Library choice: `web-push` on Workers
+| Not testable in CI                                                                                         | Manual check                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Real GeoDB / OpenWeatherMap responses (keys, quotas)                                                       | Ran the dev server's real `/api` handlers: typed errors without a key, live Open-Meteo data for Karachi (normalized, five days, cache headers); production serves live data (screenshots). |
+| `web-push` inside the Workers runtime                                                                      | Probe worker in `workerd` (`wrangler dev`): VAPID keys, aes128gcm encryption, ES256 signing and a real HTTPS send all worked.                                                              |
+| D1 SQL (migration, due query, constraints)                                                                 | Applied the migration to local D1 (SQLite); due query returned only the in-window row; `CHECK` rejected an off-step time.                                                                  |
+| Deployed headers, caching, rewrites                                                                        | `curl` against production: CSP and security headers, immutable assets, `no-cache` service worker, SPA rewrite; console checked in a fresh browser profile.                                 |
+| Visual result at real sizes, light and dark                                                                | Browser checks at 375 and 1280 in both themes; screenshots above.                                                                                                                          |
+| **Real push delivery** (push service → device), Cron on Cloudflare, `beforeinstallprompt` from Chrome, iOS | **Not covered yet**: the worker isn't deployed. The send path is unit-tested and the library verified in `workerd`; delivery needs the deploy steps below and a real device.               |
 
-The official [`web-push`](https://github.com/web-push-libs/web-push) package is written for
-Node (`node:crypto` ECDH/AES-GCM/ES256 and `node:https`). It **does work** on Cloudflare
-Workers with the `nodejs_compat` flag — verified empirically in `workerd` (Wrangler's local
-runtime, the same engine as production): VAPID key generation, aes128gcm payload encryption,
-ES256 signing and an HTTPS send all succeed. Cloudflare's docs list `node:crypto` as fully
-supported (except DSA/DH key pairs and ed448/x448) and enable the `node:https` client by
-default for compatibility dates from 2025-08-15. `web-push` 4.x is ESM-only, so it is imported
-as `import * as webpush from 'web-push'`. If bundle size ever matters more (~170 KB gzipped
-worker today), a WebCrypto-only library such as `@pushforge/builder` is the drop-in fallback;
-only `worker/src/sender.ts` would change.
+## Git and branching workflow
 
-### How it works
+- **Branches:** `feat/<name>` (or `fix/`, `chore/`, `docs/`) cut from `dev` with
+  `/start-feature`; PRs into `dev` with `/ship-feature` (runs `npm run verify` first).
+- **Releases:** `dev` → `prod` → `main` through PRs merged with **merge commits** (never squash),
+  so the three branches share one history. `prod` and `main` have rulesets requiring PRs and a
+  passing CI check. Vercel's production deployment currently follows `dev`.
+- **Commits:** Conventional Commits, enforced by commitlint in the `commit-msg` hook; header
+  ≤ 100 characters.
+- **Hooks (Husky):** `pre-commit` runs lint-staged (ESLint `--fix` + Prettier on staged files),
+  `pre-push` runs the type check and unit tests.
+- **CI** (`.github/workflows/ci.yml`) on every PR and push to `dev`/`prod`/`main`: lint (with the
+  worker's types installed), typecheck, unit tests, build (+ budget and secrets scan),
+  `vercel.json` sync, Playwright, Lighthouse CI; a second job type-checks, tests and dry-run
+  bundles the worker.
+- **Prompt log:** a `UserPromptSubmit` hook appends every prompt to `PROMPTS.md`.
 
-- `POST /subscribe` / `POST /unsubscribe` — Zod-validated (subscription, `HH:mm` in 5-minute
-  steps, IANA time zone, city name + coordinates), CORS restricted to `ALLOWED_ORIGINS`.
-- Cron (`*/5 * * * *`): per time zone, finds subscriptions due in the last hour that weren't
-  sent today, fetches one Open-Meteo forecast per place, sends, and **deletes subscriptions that
-  return 404 or 410**. Transient failures are retried on the next run; a reminder is never more
-  than an hour late (no "morning" reminder in the evening).
-- `worker/src/reminders.ts` is pure: the store, sender, forecast source and clock are
-  parameters, so it is unit-tested with fakes.
-- In the app, an explainer dialog (what you get, when, how to turn it off, reminder time
-  validated on blur) comes **before** the browser's permission prompt; only "Turn on reminders"
-  calls `Notification.requestPermission()` and `pushManager.subscribe()`. Missing support and a
-  denied permission get their own explanations; nothing else in the app depends on push.
-- The service worker's `push` handler validates the payload; `notificationclick` focuses or
-  opens WeatherBoard on the saved city (`/?name=…&lat=…&lon=…`, validated, then cleaned up).
+## APIs and rate limits
 
-### iOS
+| API                                 | Used by                  | Key                              | Limits (free tier)       | Handling                                                                                                                                                                                     |
+| ----------------------------------- | ------------------------ | -------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GeoDB Cities (RapidAPI)             | `api/cities.ts`          | `RAPIDAPI_KEY`                   | about 1 request/second   | 150 ms debounce + aborted stale requests; edge cache (`s-maxage` 1 day, `stale-while-revalidate` 7 days); 429 → `RATE_LIMITED` with `Retry-After` → UI countdown that retries automatically. |
+| OpenWeatherMap (2.5)                | `api/weather.ts`         | `OPENWEATHER_API_KEY` (optional) | 60 calls/minute          | 10-minute client `staleTime`, edge cache (`s-maxage` 10 min); 429/5xx/network → **automatic fallback to Open-Meteo**.                                                                        |
+| Open-Meteo                          | `api/weather.ts`, worker | none                             | fair-use, non-commercial | Fallback provider; the worker fetches **one** forecast per place per cron run however many subscribers share it.                                                                             |
+| Push services (FCM, Mozilla, Apple) | worker                   | VAPID key pair                   | per-service              | `TTL` 6 h, `topic` so a newer reminder replaces an undelivered one; 404/410 → subscription deleted; other failures retried next run (same day).                                              |
 
-Web Push on iPhone and iPad (iOS/iPadOS 16.4+) works **only in the installed PWA**: open the
-site in Safari → Share → “Add to Home Screen”, then open WeatherBoard from the Home Screen and
-turn reminders on there. In a Safari tab the reminder card explains this instead of offering a
-button.
+On the client, weather 4xx errors are never retried; 5xx are retried 3× with exponential backoff
+(1 s, 2 s, 4 s); focus refetches are throttled to one per minute; manual refresh to one per 10 s.
 
-### Setup
+## Setup and environment variables
+
+```bash
+nvm use                       # Node 24 (engines are enforced via .npmrc)
+npm ci
+cp .env.example .env.local    # fill in what you have; everything optional works without it
+npm run dev                   # the dev server also serves /api/* with .env.local
+npm run verify                # lint → typecheck → test → build → vercel.json check → e2e
+```
+
+| Variable                                | Where                          | Required     | Purpose                                                         |
+| --------------------------------------- | ------------------------------ | ------------ | --------------------------------------------------------------- |
+| `RAPIDAPI_KEY`                          | Vercel (server)                | for search   | GeoDB Cities key; without it search answers "unavailable".      |
+| `GEODB_API_HOST`                        | Vercel (server)                | no           | Override of `wft-geo-db.p.rapidapi.com`.                        |
+| `OPENWEATHER_API_KEY`                   | Vercel (server)                | no           | Primary weather provider; without it Open-Meteo answers.        |
+| `VITE_PUSH_WORKER_URL`                  | Vercel (build)                 | for push     | Origin of the deployed worker; reminders are hidden when unset. |
+| `VITE_VAPID_PUBLIC_KEY`                 | Vercel (build)                 | for push     | VAPID public key (base64url).                                   |
+| `WORKER_URL`, `PROXY_URL`               | deploy step                    | no           | Origins added to the CSP by `npm run vercel:config -- --write`. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Cloudflare (`wrangler secret`) | for push     | Signing keys for Web Push.                                      |
+| `ALLOWED_ORIGINS`, `VAPID_SUBJECT`      | `worker/wrangler.toml`         | yes (worker) | CORS allowlist and contact for push services.                   |
+
+**Deploying the push worker** (needs your Cloudflare account):
 
 ```bash
 cd worker && npm ci
-npx web-push generate-vapid-keys                       # once
-npx wrangler d1 create weatherboard-push-dev           # put the id into wrangler.toml
-npm run db:migrate:dev
-npx wrangler secret put VAPID_PUBLIC_KEY  --env dev
-npx wrangler secret put VAPID_PRIVATE_KEY --env dev
-npm run deploy:dev
+npx web-push generate-vapid-keys
+npx wrangler d1 create weatherboard-push            # put the id into wrangler.toml [env.production]
+npm run db:migrate:production
+npx wrangler secret put VAPID_PUBLIC_KEY  --env production
+npx wrangler secret put VAPID_PRIVATE_KEY --env production
+npm run deploy:production
 ```
 
-Then set `VITE_PUSH_WORKER_URL` (the worker's origin) and `VITE_VAPID_PUBLIC_KEY` for the web
-app, and pass the same origin as `WORKER_URL` to `npm run vercel:config` so the CSP allows it.
-Repeat with `--env production` / `npm run deploy:production` for production.
+Then set `VITE_PUSH_WORKER_URL` and `VITE_VAPID_PUBLIC_KEY` in Vercel and render the CSP with
+`WORKER_URL=<worker origin> npm run vercel:config -- --write`. Use `--env dev` for a dev worker.
 
-## PWA and offline
+Other scripts: `npm run analyze` (bundle treemap), `npm run icons` (regenerate PWA icons from
+`public/icon.svg`), `npm run lhci` (Lighthouse locally; set `CHROME_PATH` on Windows).
 
-- `vite-plugin-pwa` with the **injectManifest** strategy: `src/sw.ts` is hand-written (push
-  handlers will live in the same worker), the plugin compiles it and injects the precache list.
-- **Precache:** the app shell (JS, CSS, HTML, icons, Latin Inter subsets).
-- **`/api/weather`:** `NetworkFirst` into its own cache `weather-last-city` with
-  `ExpirationPlugin({ maxEntries: 1 })` — only the last viewed city is kept.
-- **`/api/cities`:** never cached (`NetworkOnly`).
-- Icons are generated from `public/icon.svg` with `npm run icons` (192, 512, maskable 512,
-  Apple touch icon).
-- Offline, the UI shows a page banner, renders the cached last city with “Offline — saved data.
-  This weather was observed 2 hours ago”, and city search says it needs a connection.
-- Playwright blocks service workers by default (they would bypass `page.route` mocks); the PWA
-  spec opts back in and mocks on the browser context, which also sees worker requests.
+## Known limitations
 
-### Why NetworkFirst and not StaleWhileRevalidate for weather
-
-- **Freshness is the product.** StaleWhileRevalidate always answers from the cache first and
-  updates it in the background, so an online user would see the _previous_ response — possibly
-  hours old — and only get today's weather on the _next_ request. NetworkFirst gives online
-  users live data every time and uses the cache only when the network fails or times out (6 s).
-- **The cache is a fallback, not a speed-up.** In-memory caching already exists in TanStack
-  Query (10-minute `staleTime`) and at the edge (`s-maxage=600`); a second "serve stale first"
-  layer would only stack staleness on top.
-- **Honest offline UI.** With NetworkFirst, a cached response is only ever shown when the
-  device is offline (or the API is down) — exactly when the UI labels it with its age. With
-  StaleWhileRevalidate, stale data would appear silently while online, unlabelled.
-- **`maxEntries: 1` fits NetworkFirst.** The single entry is always the last successful live
-  response for the last viewed city — the best possible offline answer.
-
-## Deployment notes (Vercel)
-
-### Rewrites and caching
-
-- Every path except `/api/*` is rewritten to `/index.html`, so client-side routes work on reload.
-  Real files (e.g. `/assets/*`, `/favicon.svg`) are served before rewrites apply.
-- `/assets/*` gets `Cache-Control: public, max-age=31536000, immutable`. Vite puts a content
-  hash in every filename there, so a changed file always has a new URL. `index.html` keeps
-  Vercel's default (`max-age=0, must-revalidate`), so new deploys are picked up immediately.
-
-### CSP placeholders
-
-Vercel reads `vercel.json` as-is and never substitutes environment variables. So the
-placeholders live in **`vercel.template.json`** (`connect-src 'self' __PROXY_ORIGIN__
-__WORKER_ORIGIN__`) and the committed `vercel.json` is always a **rendered, valid** file:
-
-```bash
-npm run vercel:config -- --write                                   # no extra origins
-WORKER_URL=https://<worker>.workers.dev npm run vercel:config -- --write
-npm run vercel:config -- --check                                   # CI: in sync with template
-```
-
-Both values are optional and Zod-validated (https only, reduced to their origin); unset means
-"no such origin". `PROXY_URL` stays unset while the proxy is this app's own `/api`, which
-`'self'` covers. Run the render with `WORKER_URL` in the deploy step once the push worker is
-live. (Earlier, the placeholders sat in `vercel.json` itself; production then served them
-literally and every page load logged two "invalid CSP source" console errors — found by the
-hardening audit, fixed by the template.) If config ever needs to be computed by Vercel itself,
-migrate to `vercel.ts`, which runs at build time and can read env vars.
-
-### Content-Security-Policy, directive by directive
-
-```text
-# Fallback for every fetch directive not listed below: only this origin.
-default-src 'self';
-
-# JavaScript only from our own origin. No 'unsafe-inline', no 'unsafe-eval', no CDNs:
-# an injected <script> or inline event handler will not run. Vite emits external bundles only.
-script-src 'self';
-
-# Stylesheets only from our own origin (Tailwind compiles to a file in /assets).
-# React's style={...} prop is applied via CSSOM and is not affected.
-style-src 'self';
-
-# Images from our origin plus data: URIs (small inlined icons/SVGs).
-# Add the weather-icon host here if icons are loaded from the API provider.
-img-src 'self' data:;
-
-# Web fonts only from our origin (self-host fonts; no Google Fonts CDN).
-font-src 'self';
-
-# fetch/XHR/WebSocket/EventSource targets: our origin (incl. /api), the weather proxy,
-# and the Cloudflare Worker. Filled from env by `npm run vercel:config`.
-connect-src 'self' __PROXY_ORIGIN__ __WORKER_ORIGIN__;
-
-# The web app manifest must come from our origin.
-manifest-src 'self';
-
-# Service worker (and any web workers) only from our origin.
-worker-src 'self';
-
-# No <object>, <embed> or <applet> — plugin content is a classic XSS vector.
-object-src 'none';
-
-# Blocks injected <base href> tags from redirecting relative URLs to another host.
-base-uri 'self';
-
-# Forms may only submit to our origin (stops injected forms from posting data elsewhere).
-form-action 'self';
-
-# Nobody may frame this app (clickjacking protection). Supersedes X-Frame-Options,
-# which is still sent as DENY for older browsers.
-frame-ancestors 'none';
-
-# Rewrites any accidental http:// subresource URL to https:// instead of loading it insecurely.
-upgrade-insecure-requests
-```
-
-### Other security headers
-
-- `X-Content-Type-Options: nosniff` — the browser must trust the declared MIME type, so a
-  file served as text cannot be executed as a script.
-- `Referrer-Policy: strict-origin-when-cross-origin` — full URL to our own origin, only the
-  origin to other https sites, nothing on https → http.
-- `Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=(), usb=()` —
-  geolocation only for our own pages (for "use my location"); the rest is disabled.
-  Notifications are **not** in this list on purpose: there is no `notifications` feature in the
-  Permissions-Policy spec, and Chrome logs an "Unrecognized feature" console error for it
-  (which would also cost Lighthouse best-practices points). Notification permission is gated by
-  `Notification.requestPermission()` on our own origin, and `frame-ancestors 'none'` already
-  prevents any third-party page from embedding the app to prompt for it.
-- `X-Frame-Options: DENY` — legacy twin of `frame-ancestors 'none'`.
-- HSTS is added by Vercel automatically for its domains and custom domains.
+- **GeoDB rate limits.** The free tier allows about one request per second. Fast typing or
+  several users at once can hit it; the UI explains and retries automatically after
+  `Retry-After`, and the edge cache absorbs repeated queries, but search can pause for a moment.
+- **iOS push needs the installed PWA.** On iPhone/iPad (iOS 16.4+), Web Push only works after
+  "Add to Home Screen" and opening WeatherBoard from the Home Screen; in a Safari tab the card
+  explains this instead of offering a button.
+- **Five-minute reminder granularity.** The cron runs every 5 minutes, so reminder times are in
+  5-minute steps and arrive within a few minutes of the chosen time. A missed run catches up for
+  at most 60 minutes, so a morning reminder is never delivered in the evening.
+- **Push is not deployed yet.** Real delivery to a device hasn't been exercised end to end.
+- **Dev-only advisories.** `npm audit` lists 21 issues in development tooling (Lighthouse CI,
+  typescript-eslint, workbox-build); none ship, and npm only offers major-version downgrades.
+- **Local Lighthouse.** On slower machines performance can dip below 0.9 (Total Blocking Time);
+  GitHub's runners pass. The next lever is `zod/mini` for client-side validation.
+- **Offline is one city deep.** By design only the last viewed city's weather is cached.
