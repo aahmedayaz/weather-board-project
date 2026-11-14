@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures.js';
 
 const viewports = [
   { width: 375, height: 812, columns: 1 },
