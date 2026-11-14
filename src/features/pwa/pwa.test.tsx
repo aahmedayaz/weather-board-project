@@ -37,7 +37,7 @@ describe('update toast', () => {
 describe('install button', () => {
   it('stays hidden until the browser offers installation, then prompts once', async () => {
     const target = new EventTarget();
-    listenForInstallPrompt(target as Window);
+    listenForInstallPrompt(target);
     render(<InstallButton />);
     expect(screen.queryByRole('button', { name: 'Install app' })).not.toBeInTheDocument();
 

@@ -8,7 +8,14 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'playwright-report', 'test-results']),
+  globalIgnores([
+    'dist',
+    'dist-e2e',
+    'worker/.wrangler',
+    'coverage',
+    'playwright-report',
+    'test-results',
+  ]),
 
   // TypeScript: type-aware rules (they need the type checker, so `projectService` is on).
   {

@@ -42,7 +42,9 @@ export function usePwaState(): PwaState {
  * Call once at startup, before React renders: `beforeinstallprompt` can fire before any
  * component mounts. The browser's own mini-infobar is suppressed in favour of our button.
  */
-export function listenForInstallPrompt(target: Window = window): void {
+export function listenForInstallPrompt(
+  target: Pick<EventTarget, 'addEventListener'> = window,
+): void {
   target.addEventListener('beforeinstallprompt', (event) => {
     if (!isInstallPromptEvent(event)) return;
     event.preventDefault();

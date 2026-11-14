@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { FavoritesPanel, FavoriteToggle } from '@/features/favorites';
 import { InstallButton, OfflineBanner, UpdateToast } from '@/features/pwa';
+import { ReminderCard } from '@/features/push';
 import { CitySearch, focusCitySearch, formatCityDetail, type City } from '@/features/search';
 import { CurrentConditions, ForecastStrip, usePrefetchWeather } from '@/features/weather';
 import { Card, DashboardGrid } from '@/shared/ui';
@@ -9,9 +10,9 @@ import { Card, DashboardGrid } from '@/shared/ui';
 import { AppShell } from './AppShell';
 import { readLastCity, saveLastCity } from './lastCity';
 
-export function App() {
+export function App({ initialCity }: { initialCity?: City }) {
   // Lazy initializer: storage is read once, on mount — not on every render.
-  const [city, setCity] = useState<City>(readLastCity);
+  const [city, setCity] = useState<City>(() => initialCity ?? readLastCity());
   const prefetchWeather = usePrefetchWeather();
 
   // Stable (no deps) so memoized children (search rows) keep skipping re-renders.
@@ -51,6 +52,8 @@ export function App() {
           onSearchAgain={focusCitySearch}
           className="md:col-span-2 xl:col-span-8 xl:col-start-5 xl:row-start-2"
         />
+
+        <ReminderCard city={city} className="md:col-span-2 xl:col-span-4 xl:row-start-3" />
       </DashboardGrid>
       <UpdateToast />
     </AppShell>

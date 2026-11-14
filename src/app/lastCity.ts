@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { CitySchema, type City } from '@/shared/api/cities-contract';
 import { readStorage, writeStorage } from '@/shared/lib/storage';
 
@@ -24,4 +26,43 @@ export function readLastCity(): City {
 
 export function saveLastCity(city: City): void {
   writeStorage(LAST_CITY_STORAGE_KEY, city);
+}
+
+/** `?name=Karachi&lat=24.86&lon=67` — what a reminder notification links to. */
+const CityParamsSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  lat: z.string().trim().min(1).transform(Number).pipe(z.number().min(-90).max(90)),
+  lon: z.string().trim().min(1).transform(Number).pipe(z.number().min(-180).max(180)),
+});
+
+/**
+ * Stable negative id for a place known only by coordinates (~1 km grid), so it can't
+ * collide with GeoDB ids (positive) or the default city (0).
+ */
+export const coordinateCityId = (lat: number, lon: number) =>
+  -(Math.round((lat + 90) * 100) * 100_000 + Math.round((lon + 180) * 100) + 1);
+
+export function readCityFromUrl(search: string): City | null {
+  const params = new URLSearchParams(search);
+  const parsed = CityParamsSchema.safeParse({
+    name: params.get('name') ?? '',
+    lat: params.get('lat') ?? '',
+    lon: params.get('lon') ?? '',
+  });
+  if (!parsed.success) return null;
+  const { name, lat, lon } = parsed.data;
+  return { id: coordinateCityId(lat, lon), name, region: null, country: '', lat, lon };
+}
+
+/**
+ * Startup city: a valid city in the URL (opened from a reminder) wins and becomes the
+ * remembered city; the URL is then cleaned. Otherwise the last viewed city, else Karachi.
+ * Call once, before the first render.
+ */
+export function resolveInitialCity(location: Location = window.location): City {
+  const fromUrl = readCityFromUrl(location.search);
+  if (!fromUrl) return readLastCity();
+  saveLastCity(fromUrl);
+  window.history.replaceState(null, '', location.pathname);
+  return fromUrl;
 }
