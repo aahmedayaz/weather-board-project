@@ -212,6 +212,28 @@ test.describe('daily reminder (push)', () => {
     await expect(page.getByText('29°', { exact: true })).toBeVisible();
   });
 
+  test('at 1280 px the reminder card stacks right under favourites (no empty gap)', async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await stubPush(context);
+    await mockWorker(context);
+    await page.goto('/');
+    const card = (title: string) =>
+      page.locator('[data-testid="dashboard-grid"] > *').filter({
+        has: page.getByRole('heading', { name: title, exact: true }),
+      });
+    await expect(card('Daily reminder')).toBeVisible();
+
+    const favourites = await card('Favourites').boundingBox();
+    const reminder = await card('Daily reminder').boundingBox();
+    expect(reminder?.x).toBe(favourites?.x); // same (left) column
+    const gap = (reminder?.y ?? 0) - ((favourites?.y ?? 0) + (favourites?.height ?? 0));
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(24); // the grid gap, nothing more
+  });
+
   test('explainer dialog has no detectable WCAG 2.2 AA violations', async ({ page, context }) => {
     await stubPush(context);
     await mockWorker(context);
