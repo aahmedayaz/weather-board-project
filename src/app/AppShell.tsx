@@ -12,7 +12,8 @@ export function AppShell({
     <div className="flex min-h-dvh flex-col bg-canvas text-fg">
       <a
         href="#main"
-        className="sr-only rounded-md bg-surface px-4 py-3 text-sm font-medium shadow-overlay focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
+        // not-sr-only resets padding to 0, so the 44 px height comes from min-height instead.
+        className="sr-only rounded-md bg-surface text-sm font-medium shadow-overlay focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:px-4"
       >
         Skip to main content
       </a>
