@@ -11,12 +11,12 @@ strict TypeScript; API keys stay server-side in Vercel Functions and a Cloudflar
 | ![WeatherBoard at 375 px](docs/screenshots/weatherboard-375.png) | ![WeatherBoard at 1280 px](docs/screenshots/weatherboard-1280.png) |
 
 Dark theme at 1280 px: [docs/screenshots/weatherboard-1280-dark.png](docs/screenshots/weatherboard-1280-dark.png).
-Screenshots are of the live site with real data (three cities saved as favourites).
+Screenshots are of the live site with real data (three cities saved as favourites), taken
+before the push worker went live — production now also shows the **Daily reminder** card.
 
-> **Production right now:** Vercel deploys the latest `dev`. `OPENWEATHER_API_KEY` is not set
-> there, so weather comes from the Open-Meteo fallback (the footer says so), and the push worker
-> isn't deployed yet, so the reminder card is hidden. Both are configuration, not code — see
-> [Setup](#setup-and-environment-variables).
+> **Production:** Vercel's production branch is `main` (promoted `dev` → `prod` → `main`).
+> Weather comes from OpenWeatherMap, and daily push reminders are live through the Cloudflare
+> Worker — verified end to end on 2026-11-14 (see [Testing strategy](#testing-strategy)).
 
 ## Contents
 
@@ -351,14 +351,16 @@ context, which also sees service-worker requests.
 
 **What CI cannot test end to end, and how it was checked manually:**
 
-| Not testable in CI                                                                                         | Manual check                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Real GeoDB / OpenWeatherMap responses (keys, quotas)                                                       | Ran the dev server's real `/api` handlers: typed errors without a key, live Open-Meteo data for Karachi (normalized, five days, cache headers); production serves live data (screenshots). |
-| `web-push` inside the Workers runtime                                                                      | Probe worker in `workerd` (`wrangler dev`): VAPID keys, aes128gcm encryption, ES256 signing and a real HTTPS send all worked.                                                              |
-| D1 SQL (migration, due query, constraints)                                                                 | Applied the migration to local D1 (SQLite); due query returned only the in-window row; `CHECK` rejected an off-step time.                                                                  |
-| Deployed headers, caching, rewrites                                                                        | `curl` against production: CSP and security headers, immutable assets, `no-cache` service worker, SPA rewrite; console checked in a fresh browser profile.                                 |
-| Visual result at real sizes, light and dark                                                                | Browser checks at 375 and 1280 in both themes; screenshots above.                                                                                                                          |
-| **Real push delivery** (push service → device), Cron on Cloudflare, `beforeinstallprompt` from Chrome, iOS | **Not covered yet**: the worker isn't deployed. The send path is unit-tested and the library verified in `workerd`; delivery needs the deploy steps below and a real device.               |
+| Not testable in CI                                                     | Manual check                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real GeoDB / OpenWeatherMap responses (keys, quotas)                   | Ran the dev server's real `/api` handlers: typed errors without a key, live Open-Meteo data for Karachi (normalized, five days, cache headers); production serves live data (screenshots).                                                                                                      |
+| `web-push` inside the Workers runtime                                  | Probe worker in `workerd` (`wrangler dev`): VAPID keys, aes128gcm encryption, ES256 signing and a real HTTPS send all worked.                                                                                                                                                                   |
+| D1 SQL (migration, due query, constraints)                             | Applied the migration to local D1 (SQLite); due query returned only the in-window row; `CHECK` rejected an off-step time.                                                                                                                                                                       |
+| Deployed headers, caching, rewrites                                    | `curl` against production: CSP and security headers, immutable assets, `no-cache` service worker, SPA rewrite; console checked in a fresh browser profile.                                                                                                                                      |
+| Visual result at real sizes, light and dark                            | Browser checks at 375 and 1280 in both themes; screenshots above.                                                                                                                                                                                                                               |
+| Live Worker: CORS, validation, secrets, D1 schema                      | `curl` against the deployed Worker: 204 preflight for the production origin, 403 for others, 400s with specific messages, 404 for unknown paths; secrets listed (names only), migration applied.                                                                                                |
+| **Real push delivery** (push service → device) via the Cloudflare Cron | **Verified 2026-11-14** in real Chrome against production: subscribed through the UI (FCM), the row appeared in D1, the 12:10 Asia/Karachi cron delivered "Karachi: 30° / 24° — Drizzle. 58% chance of rain." to the service worker, then Turn off removed the row (0 left). No console errors. |
+| `beforeinstallprompt` from Chrome, iOS                                 | **Not covered**: the install prompt's timing is up to Chrome's engagement heuristics, and iOS needs a physical device; both paths are covered by e2e with stubs.                                                                                                                                |
 
 ## Git and branching workflow
 
@@ -366,7 +368,9 @@ context, which also sees service-worker requests.
   `/start-feature`; PRs into `dev` with `/ship-feature` (runs `npm run verify` first).
 - **Releases:** `dev` → `prod` → `main` through PRs merged with **merge commits** (never squash),
   so the three branches share one history. `prod` and `main` have rulesets requiring PRs and a
-  passing CI check. Vercel's production deployment currently follows `dev`.
+  passing CI check. **Vercel's production branch is `main`**; `dev` and feature branches get
+  preview deployments (behind Vercel Deployment Protection), so a change reaches the live site
+  only after both promotions.
 - **Commits:** Conventional Commits, enforced by commitlint in the `commit-msg` hook; header
   ≤ 100 characters.
 - **Hooks (Husky):** `pre-commit` runs lint-staged (ESLint `--fix` + Prettier on staged files),
@@ -439,7 +443,8 @@ Other scripts: `npm run analyze` (bundle treemap), `npm run icons` (regenerate P
 - **Five-minute reminder granularity.** The cron runs every 5 minutes, so reminder times are in
   5-minute steps and arrive within a few minutes of the chosen time. A missed run catches up for
   at most 60 minutes, so a morning reminder is never delivered in the evening.
-- **Push is not deployed yet.** Real delivery to a device hasn't been exercised end to end.
+- **Push only on the production origin.** The Worker's CORS allowlist holds
+  `https://weather-board-project.vercel.app`; preview deployments can't subscribe.
 - **Dev-only advisories.** `npm audit` lists 21 issues in development tooling (Lighthouse CI,
   typescript-eslint, workbox-build); none ship, and npm only offers major-version downgrades.
 - **Local Lighthouse.** On slower machines performance can dip below 0.9 (Total Blocking Time);
