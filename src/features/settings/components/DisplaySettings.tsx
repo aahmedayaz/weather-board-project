@@ -62,7 +62,12 @@ export function DisplaySettings() {
 
   return (
     <div className="flex items-center gap-2">
-      <SegmentedControl label="Units" options={UNIT_OPTIONS} value={units} onChange={setUnits} />
+      <SegmentedControl
+        label="Temperature unit"
+        options={UNIT_OPTIONS}
+        value={units}
+        onChange={setUnits}
+      />
       <SegmentedControl
         label={`Theme (now ${theme.resolved})`}
         options={THEME_OPTIONS}
