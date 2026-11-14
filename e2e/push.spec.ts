@@ -129,7 +129,8 @@ test.describe('daily reminder (push)', () => {
     expect(posts[0]?.path).toBe('/subscribe');
     expect(posts[0]?.body).toMatchObject({
       reminderTime: '06:45',
-      timezone: expect.stringMatching(/\//),
+      // The browser's IANA zone: "Area/City" on most machines, plain "UTC" on CI runners.
+      timezone: expect.stringMatching(/^(?:UTC|[A-Za-z_]+\/[A-Za-z_/+-]+)$/),
       city: { name: 'Karachi', lat: 24.8607, lon: 67.0011 },
       subscription: { endpoint: 'https://push.example.test/sub/abc' },
     });
