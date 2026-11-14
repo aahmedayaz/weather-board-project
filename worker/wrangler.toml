@@ -1,0 +1,59 @@
+# WeatherBoard push worker — daily forecast reminders.
+#
+# One-time setup per environment (dev shown; repeat with --env production):
+#   npx wrangler d1 create weatherboard-push-dev          # paste the id into database_id below
+#   npx wrangler d1 migrations apply DB --env dev --remote
+#   npx wrangler secret put VAPID_PUBLIC_KEY  --env dev
+#   npx wrangler secret put VAPID_PRIVATE_KEY --env dev
+#   npx wrangler deploy --env dev
+# Generate a VAPID key pair with: npx web-push generate-vapid-keys
+# (The public key also goes into the web app as VITE_VAPID_PUBLIC_KEY.)
+
+name = "weatherboard-push"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+# web-push needs node:crypto (ECDH, AES-GCM, ES256) and node:https — verified working in
+# workerd under nodejs_compat (https client is on by default from 2025-08-15).
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true
+
+# ---------------------------------------------------------------------------------------
+[env.dev]
+name = "weatherboard-push-dev"
+
+[env.dev.vars]
+# Comma-separated origins allowed to call /subscribe and /unsubscribe.
+ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:4173"
+VAPID_SUBJECT = "mailto:push@weatherboard.invalid"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "weatherboard-push-dev"
+database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create`
+migrations_dir = "migrations"
+
+[env.dev.triggers]
+crons = ["*/5 * * * *"]
+
+# ---------------------------------------------------------------------------------------
+[env.production]
+name = "weatherboard-push"
+
+[env.production.vars]
+ALLOWED_ORIGINS = "https://weather-board-project.vercel.app"
+VAPID_SUBJECT = "mailto:push@weatherboard.invalid"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "weatherboard-push"
+database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create`
+migrations_dir = "migrations"
+
+[env.production.triggers]
+crons = ["*/5 * * * *"]
