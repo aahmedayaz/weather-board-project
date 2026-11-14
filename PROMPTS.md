@@ -228,3 +228,17 @@ Do not delete any prompt.
 ````text
 Test the push notification feature and fix the UI position of that div - test all the cloudflare and worker etc stuff
 ````
+
+## Prompt 14 — 2026-11-14T07:32:52.859Z
+
+````text
+i noticed one behaviour of focus border or outline border or active border - This extra things looks bad - fix this
+
+also when we click the input or clear the input - it directly show the error and doesnt disappear - it feels bad - fix this - also by toggling C or F - why it is also toggling the wind (mph and km/h )
+
+also fix this console errors - 
+
+and also update the images in the README.md - use latest ones
+
+after doing all these - i want you to push it and make it live.
+````
