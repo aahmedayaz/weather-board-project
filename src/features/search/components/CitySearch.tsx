@@ -17,6 +17,7 @@ import { SpinnerIcon } from '@/shared/ui/icons';
 
 import { CitySearchError } from '../api/searchCities';
 import { useCitySearch } from '../hooks/useCitySearch';
+import { CITY_SEARCH_INPUT_ID } from '../lib/focusCitySearch';
 
 import { CityOption } from './CityOption';
 import { RetryCountdown } from './RetryCountdown';
@@ -207,6 +208,7 @@ export function CitySearch({ onSelect }: CitySearchProps) {
             field.ref(element);
             inputRef.current = element;
           }}
+          id={CITY_SEARCH_INPUT_ID}
           label="City"
           placeholder="Search for a city"
           hint={`Type at least ${String(CITY_QUERY_MIN)} letters, then use ↑ ↓ and Enter to pick a city.`}
