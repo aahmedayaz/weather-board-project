@@ -128,6 +128,20 @@
     outline-offset: 2px;
   }
 
+  /*
+   * Text fields already have a 1 px border; an offset ring outside it reads as a double
+   * outline. Draw the ring over the border instead (one clean 2 px edge), in the danger colour
+   * when the field is invalid so the two states never stack.
+   */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: -1px;
+  }
+  [aria-invalid='true']:focus-visible {
+    outline-color: var(--wb-danger);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
