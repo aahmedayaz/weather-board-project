@@ -18,13 +18,15 @@ export function AppShell({
       </a>
 
       <header className="sticky top-0 z-10 border-b border-line bg-surface">
-        <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-2.5 px-4 md:px-6">
+        <div className="mx-auto flex min-h-14 w-full max-w-[1440px] flex-wrap items-center gap-x-2.5 gap-y-2 px-4 py-2 md:px-6">
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
             <rect width="24" height="24" rx="6" fill="var(--wb-accent)" />
             <circle cx="12" cy="12" r="4.5" fill="var(--wb-accent-fg)" />
           </svg>
           <h1 className="text-[15px] font-semibold tracking-tight">WeatherBoard</h1>
-          <div className="ml-auto flex items-center gap-2">{headerActions}</div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {headerActions}
+          </div>
         </div>
       </header>
 
