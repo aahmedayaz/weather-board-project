@@ -1,0 +1,28 @@
+{
+  "name": "weatherboard-push-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "deploy:production": "wrangler deploy --env production",
+    "db:migrate:dev": "wrangler d1 migrations apply DB --env dev --remote",
+    "db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run test && wrangler deploy --dry-run --env production --outdir .wrangler/dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261114.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.162.0"
+  },
+  "dependencies": {
+    "web-push": "^4.0.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  }
+}

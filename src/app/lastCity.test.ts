@@ -1,6 +1,38 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_CITY, LAST_CITY_STORAGE_KEY, readLastCity, saveLastCity } from './lastCity';
+import {
+  coordinateCityId,
+  DEFAULT_CITY,
+  LAST_CITY_STORAGE_KEY,
+  readCityFromUrl,
+  readLastCity,
+  saveLastCity,
+} from './lastCity';
+
+describe('city from a reminder link', () => {
+  it('reads ?name=&lat=&lon= into a city with a stable, non-colliding id', () => {
+    expect(readCityFromUrl('?name=Karachi&lat=24.86&lon=67')).toEqual({
+      id: coordinateCityId(24.86, 67),
+      name: 'Karachi',
+      region: null,
+      country: '',
+      lat: 24.86,
+      lon: 67,
+    });
+    expect(coordinateCityId(24.86, 67)).toBeLessThan(0);
+    expect(coordinateCityId(24.86, 67)).not.toBe(coordinateCityId(24.86, 67.01));
+  });
+
+  it.each([
+    ['nothing', ''],
+    ['missing lon', '?name=Karachi&lat=24.86'],
+    ['out-of-range lat', '?name=X&lat=95&lon=0'],
+    ['non-numeric coordinates', '?name=X&lat=abc&lon=0'],
+    ['an empty name', '?name=%20&lat=1&lon=1'],
+  ])('ignores %s', (_, search) => {
+    expect(readCityFromUrl(search)).toBeNull();
+  });
+});
 
 const lisbon = {
   id: 1,

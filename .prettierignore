@@ -8,3 +8,5 @@ playwright-report
 test-results
 public
 .lighthouseci
+dist-e2e
+worker/.wrangler
