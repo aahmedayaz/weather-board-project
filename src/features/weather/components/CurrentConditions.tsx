@@ -88,8 +88,10 @@ export function CurrentConditions({
         </p>
       </div>
     );
-  } else if (query.isError || query.fetchStatus === 'paused') {
-    // `paused` = TanStack is waiting for the network to come back, with nothing cached.
+  } else if (query.isError || query.isPaused) {
+    // isPaused (not `fetchStatus === 'paused'`): TanStack tracks every result property a
+    // component reads, for good. Reading fetchStatus would re-render this card on every
+    // refetch (idle → fetching → idle); isPaused only changes when the request is paused.
     body = (
       <WeatherErrorBanner
         kind={query.isError ? weatherErrorKind(query.error) : 'offline'}
