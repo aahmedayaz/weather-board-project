@@ -42,6 +42,23 @@ export function writeStorage(key: string, value: unknown): boolean {
   }
 }
 
+/**
+ * localStorage if it actually works right now, else null. Accessing `window.localStorage`
+ * itself can throw (SecurityError when cookies/storage are blocked), and some browsers
+ * expose it but throw on every write (Safari private mode, quota 0) — so probe a write.
+ */
+export function getWorkingStorage(): Storage | null {
+  try {
+    const storage = window.localStorage;
+    const probe = '__weatherboard_probe__';
+    storage.setItem(probe, '1');
+    storage.removeItem(probe);
+    return storage;
+  } catch {
+    return null;
+  }
+}
+
 export function removeStorage(key: string): void {
   try {
     window.localStorage.removeItem(key);
