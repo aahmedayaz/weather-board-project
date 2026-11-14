@@ -2,6 +2,9 @@
 
 IDE used: **Claude Code**. Every prompt submitted in this project is appended below verbatim by the `UserPromptSubmit` hook (`scripts/log-prompt.mjs`).
 
+Each prompt is followed by a **review note**: what the agent got wrong and how I corrected it.
+Housekeeping messages (questions, “continue”, log fixes) are intentionally not logged.
+
 ## Prompt 1 — ~2026-11-13T20:10Z (backfilled: submitted before the hook existed)
 
 ````text
@@ -16,6 +19,8 @@ Before writing any app code, create:
 
 Show me the files, then verify the hook works with a test prompt.
 ````
+
+> **Review note:** The hook it wrote also logged harness events (background-task notifications) as prompts, and this first prompt was never logged because the hook did not exist yet — I asked for the log to be fixed; it backfilled this entry and made the hook skip harness events.
 
 ## Prompt 2 — 2026-11-13T20:20:06.954Z
 
@@ -33,6 +38,8 @@ Add .env.example with variable names only, a sensible .gitignore, and engines fo
 Keep the app itself as an empty shell. Explain any choice that is not obvious.
 ````
 
+> **Review note:** `npm install` looked like it was running forever, so I stopped the session; on resuming, the agent found it had actually finished (only Husky’s `prepare` hadn’t run). It also had to pin TypeScript 6.0 / ESLint 9 because the template’s TypeScript 7 and oxlint don’t work with the requested typescript-eslint + jsx-a11y.
+
 ## Prompt 3 — 2026-11-13T20:57:43.310Z
 
 ````text
@@ -45,6 +52,8 @@ Explain every CSP directive in a comment in README notes I can copy later.
 
 Then commit, open the PR to "main"
 ````
+
+> **Review note:** It put the env-driven CSP placeholders directly in `vercel.json`, so production later served them literally (two console errors on every page) — caught and fixed in prompt 11 with a template. It also left `notifications` out of Permissions-Policy instead of adding it as asked, explaining why. My corrections here were log housekeeping.
 
 ## Prompt 4 — 2026-11-13T22:00:42.896Z
 
@@ -62,6 +71,8 @@ Add component tests for the Input error states and the Dialog focus behaviour.
 Keep it lean: no animation libraries.
 ````
 
+> **Review note:** It treated the palettes as “not provided” (they weren’t in the chat) and designed its own AA-checked palette; I then had to ask whether the branch came from `main` or `dev` and what `/ship-feature` does. Its focused skip link was only 20 px tall — caught later by the hardening suite.
+
 ## Prompt 5 — 2026-11-13T22:38:35.082Z
 
 ````text
@@ -76,6 +87,8 @@ Validation with react-hook-form on blur: empty field shows an inline error.
 
 Memoize result rows with a stable callback so typing does not re-render every row; show me a Profiler check or a render-count test that proves it. Add unit tests for the hook and e2e tests with mocked network for each state.
 ````
+
+> **Review note:** Validation “on blur” kept the error while typing (fixed with `mode: 'onTouched'`). It didn’t create `.env.local`, so the API “didn’t work” on localhost — I asked why, then asked it to create the env files; it created `.env.local` (git-ignored) but declined to git-ignore `.env.example`, and explained why.
 
 ## Prompt 6 — 2026-11-13T23:21:49.530Z
 
@@ -96,6 +109,8 @@ Add tests including the aggregation function and error states.
 
 ````
 
+> **Review note:** A commit header exceeded commitlint’s 100 characters and its files slid into the next commit (it rebuilt the two local commits). Local Lighthouse dipped below 0.9 and a lazy-loading attempt made it worse, so it was reverted. Reading `fetchStatus` caused extra re-renders, found later by the prompt 11 Profiler audit.
+
 ## Prompt 7 — 2026-11-14T01:00:30.563Z
 
 ````text
@@ -111,6 +126,8 @@ Removal opens the confirmation Dialog and returns focus to a sensible element af
 
 Prefetch a favourite's weather on hover or focus. Add unit tests for the store (limit, duplicates, corrupted JSON, storage disabled) and e2e for add, limit and confirm-remove.
 ````
+
+> **Review note:** No correction needed from me. It replaced a deprecated TanStack API (`prefetchQuery` → `query`) and fixed focus-after-removal timing (the dialog’s `inert` background) on its own.
 
 ## Prompt 8 — 2026-11-14T01:00:30.563Z
 
@@ -130,6 +147,8 @@ Add a custom install button using beforeinstallprompt and an update-available to
 Test offline behaviour in Playwright with context.setOffline. 
 Explain in the README notes why NetworkFirst and not StaleWhileRevalidate.
 ````
+
+> **Review note:** No correction needed from me. Its own offline test showed city search spinning (“Searching…”) forever while offline; it added an offline state.
 
 ## Prompt 9 — 2026-11-14T01:00:30.563Z
 
@@ -151,6 +170,8 @@ Add push and notificationclick handlers to src/sw.ts that open the app on the sa
 Add a note about iOS requiring the installed PWA.
 ````
 
+> **Review note:** The session stopped mid-probe and I had to tell it to continue (an orphaned `workerd` was still holding the port). Its first due-time rule would have sent a 07:30 reminder at 21:30 — its tests caught it (60-minute catch-up window). After merging, CI failed twice (worker types missing for lint, two Linux-only e2e races) and blocked the `prod` promotion until fixed; it did not bypass the branch rules.
+
 ## Prompt 10 — 2026-11-14T01:00:30.563Z
 
 ````text
@@ -166,6 +187,8 @@ Animated condition icons: lightweight inline SVG with CSS animations (sun rays r
 Do not add Lottie; explain the bundle-size reason in a code comment. 
 Add tests for conversions and e2e for persistence after reload.
 ````
+
+> **Review note:** No correction needed from me. Its own e2e tests exposed wrong test locators and jsdom’s missing `matchMedia`, which it fixed.
 
 ## Prompt 11 — 2026-11-14T01:00:30.563Z
 
@@ -183,3 +206,19 @@ Security: confirm no keys in the built bundle (grep the dist folder), no dangero
 
 Report anything you could not fix.
 ````
+
+> **Review note:** No correction needed from me. Twice a shell-quoting mistake broke a scripted edit (checked, nothing harmful, redone with the editor); it reported what it couldn’t fix (dev-only audit issues, preview headers behind Vercel’s login).
+
+## Prompt 12 — 2026-11-14T05:27:38.574Z
+
+````text
+P9-(docs/final)
+
+Write README.md: live URL, screenshots at 375 and 1280, feature list mapped to the seven requirements and three bonuses, architecture diagram (Mermaid), folder structure, data flow for search, weather and push, the Deliberate deviations section (Vercel proxy, Cloudflare Worker, why), rendering and performance decisions with the Profiler table, security decisions, testing strategy including what cannot be tested end to end in CI and how the manual check covered it, git and branching workflow, APIs used with rate-limit handling, setup and environment variables, and Known limitations (GeoDB rate limits, iOS push needs installed PWA, five-minute reminder granularity). 
+
+Then tidy PROMPTS.md: keep the order, add a one-line note per prompt on what the agent got wrong and how I corrected it. 
+
+Do not delete any prompt.
+````
+
+> **Review note:** Written in the same turn as these notes — nothing to correct yet.
