@@ -18,6 +18,12 @@ module.exports = {
         'categories:accessibility': ['error', { minScore: 0.9 }],
         'categories:best-practices': ['error', { minScore: 0.9 }],
         'categories:seo': ['error', { minScore: 0.9 }],
+        // Core Web Vitals (lab). LCP and CLS are hard limits at the "good" thresholds. INP
+        // can't be measured without a real user, so Total Blocking Time is its lab proxy —
+        // a warning, because it varies with the runner's CPU.
+        'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
+        'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }],
+        'total-blocking-time': ['warn', { maxNumericValue: 300 }],
       },
     },
     upload: {
